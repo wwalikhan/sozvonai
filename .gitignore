@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Whisper models / audio artifacts
+models/
+*.wav
+*.mp3
+*.m4a
+uploads/
+
+# Нативные бинарники, скачанные вручную (ffmpeg-shared для torchcodec и т.п.)
+backend/.tools/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code / AI-tooling internals — не часть продукта, не для публичного репо
+.claude/
+tools/
+archive/
+.env
+*.env.local
+
+# Рантайм-данные приложения (реальные аудиозаписи звонков, транскрипты, БД) —
+# приватные данные пользователя, никогда не в git
+backend/storage/

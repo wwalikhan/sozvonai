@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SozvonAI — транскрипт</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F6FA;
+    --surface: #FFFFFF;
+    --surface-sunken: #ECEEF5;
+    --ink: #171933;
+    --ink-soft: #6E7191;
+    --rule: #DFE1EC;
+    --primary: #3B3FE0;
+    --primary-soft: #EDEDFC;
+    --live: #FF5A36;
+    --live-soft: #FFE7E0;
+    --speaker-a: #1F8A70;
+    --speaker-a-bg: #E6F3EF;
+    --speaker-b: #C77D24;
+    --speaker-b-bg: #F8ECDB;
+    --ok: #1F8A70;
+    --ok-bg: #E6F3EF;
+    --warn: #C77D24;
+    --warn-bg: #F8ECDB;
+    --danger: #E0483B;
+    --danger-bg: #FBE3E1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12132A;
+      --surface: #1B1D3D;
+      --surface-sunken: #14152F;
+      --ink: #E9EAF7;
+      --ink-soft: #9A9CC4;
+      --rule: #33355C;
+      --primary: #8285FF;
+      --primary-soft: #292B58;
+      --live: #FF8064;
+      --live-soft: #3B2620;
+      --speaker-a: #52C4A4;
+      --speaker-a-bg: #17332C;
+      --speaker-b: #E3AA5F;
+      --speaker-b-bg: #332715;
+      --ok: #52C4A4;
+      --ok-bg: #17332C;
+      --warn: #E3AA5F;
+      --warn-bg: #332715;
+      --danger: #F0685C;
+      --danger-bg: #3B211E;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a:focus-visible, button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 36px 20px 90px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 22px;
+    margin-bottom: 30px;
+  }
+
+  .wordmark {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 24px;
+    letter-spacing: -0.01em;
+  }
+
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  a { color: inherit; }
+
+  .btn-ghost {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    text-decoration: none;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+    padding: 8px 4px;
+    transition: color 0.15s ease;
+  }
+
+  .btn-ghost:hover { color: var(--primary); }
+
+  .btn-primary {
+    display: inline-block;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    border-radius: 10px;
+    padding: 11px 20px;
+    cursor: pointer;
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 8px 20px -10px rgba(59, 63, 224, 0.55);
+    transition: transform 0.15s ease;
+  }
+
+  .btn-primary:hover { transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 9px 16px;
+    cursor: pointer;
+    background: var(--surface);
+    color: var(--ink);
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+
+  .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+
+  .call-header { margin-bottom: 30px; }
+
+  .call-header h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 30px;
+    margin: 0 0 12px;
+    letter-spacing: -0.01em;
+  }
+
+  .call-meta-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 14px;
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+  }
+
+  .meta-sep {
+    width: 1px;
+    height: 12px;
+    background: var(--rule);
+    flex-shrink: 0;
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 999px;
+    color: var(--ink-soft);
+    background: var(--surface-sunken);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .status-pill .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ink-soft);
+    flex-shrink: 0;
+  }
+
+  .status-pill.recording { color: var(--live); background: var(--live-soft); }
+  .status-pill.recording .dot { background: var(--live); animation: pulse 1.6s ease-in-out infinite; }
+  .status-pill.processing { color: var(--warn); background: var(--warn-bg); }
+  .status-pill.processing .dot { background: var(--warn); animation: pulse 1.6s ease-in-out infinite; }
+  .status-pill.done { color: var(--ok); background: var(--ok-bg); }
+  .status-pill.done .dot { background: var(--ok); }
+  .status-pill.failed { color: var(--danger); background: var(--danger-bg); }
+  .status-pill.failed .dot { background: var(--danger); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.85); }
+  }
+
+  .error-box {
+    background: var(--surface);
+    border: 1px solid var(--danger);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 30px;
+  }
+
+  .error-box strong {
+    display: block;
+    color: var(--danger);
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+
+  .error-box .error-text {
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+
+  section { margin-bottom: 34px; }
+
+  section h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 17px;
+    margin: 0 0 14px;
+  }
+
+  .speakers-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .speaker-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--surface-sunken);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+  }
+
+  .speaker-chip:hover { border-color: var(--rule); }
+
+  .speaker-chip .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .speaker-chip.s1 { background: var(--speaker-a-bg); }
+  .speaker-chip.s1 .dot { background: var(--speaker-a); }
+  .speaker-chip.s1 .speaker-name { color: var(--speaker-a); }
+  .speaker-chip.s2 { background: var(--speaker-b-bg); }
+  .speaker-chip.s2 .dot { background: var(--speaker-b); }
+  .speaker-chip.s2 .speaker-name { color: var(--speaker-b); }
+  .speaker-chip.s3 { background: var(--surface-sunken); }
+  .speaker-chip.s3 .dot { background: var(--ink-soft); }
+  .speaker-chip.s3 .speaker-name { color: var(--ink); }
+
+  .speaker-chip small {
+    color: var(--ink-soft);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 400;
+    font-size: 12px;
+  }
+
+  .speaker-name-input {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 14px;
+    border: none;
+    border-bottom: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    padding: 0 0 1px;
+    outline: none;
+    width: 10ch;
+  }
+
+  .export-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 1px 2px rgba(23, 25, 51, 0.05), 0 16px 32px -20px rgba(59, 63, 224, 0.35);
+  }
+
+  .transcript {
+    background: var(--surface-sunken);
+    border-radius: 14px;
+    padding: 8px 22px;
+    min-height: 200px;
+  }
+
+  .placeholder {
+    color: var(--ink-soft);
+    font-size: 15px;
+    padding: 44px 12px;
+    text-align: center;
+  }
+
+  .turn {
+    padding: 16px 18px;
+    margin: 10px 0;
+    border-left: 3px solid var(--ink-soft);
+    border-radius: 0 10px 10px 0;
+    background: var(--surface);
+  }
+
+  .turn.s1 { border-left-color: var(--speaker-a); }
+  .turn.s2 { border-left-color: var(--speaker-b); }
+  .turn.none { border-left-color: var(--rule); }
+
+  .turn-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 5px;
+    flex-wrap: wrap;
+  }
+
+  .turn-head-left {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .speaker {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  .speaker.s1 { color: var(--speaker-a); }
+  .speaker.s2 { color: var(--speaker-b); }
+  .speaker.s3 { color: var(--ink); }
+  .speaker.none { color: var(--ink-soft); font-style: italic; font-weight: 500; }
+
+  .pending-tag {
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-style: italic;
+    animation: soft-pulse 1.8s ease-in-out infinite;
+  }
+
+  @keyframes soft-pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
+  }
+
+  .timecode {
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .text {
+    font-size: 16px;
+    line-height: 1.55;
+    max-width: 62ch;
+  }
+
+  @media (max-width: 520px) {
+    .panel { padding: 12px; border-radius: 16px; }
+    .transcript { padding: 6px 14px; }
+    .export-actions { flex-wrap: wrap; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pending-tag { animation: none; }
+    .status-pill.recording .dot,
+    .status-pill.processing .dot { animation: none; }
+    .btn-primary, .btn-outline { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="wordmark">SozvonAI</div>
+      <div class="nav-actions">
+        <a class="btn-ghost" href="calls.html">Все звонки</a>
+        <a class="btn-ghost" href="videos.html">Видео-инсайты</a>
+        <a class="btn-primary" href="live.html">Новый звонок</a>
+      </div>
+    </header>
+
+    <div class="call-header">
+      <h1 id="call-title">Загрузка…</h1>
+      <div class="call-meta-line" id="call-meta"></div>
+      <span class="status-pill" id="call-status"><span class="dot"></span><span id="call-status-text">—</span></span>
+    </div>
+
+    <div class="error-box" id="error-box" hidden>
+      <strong>Не удалось обработать звонок</strong>
+      <div class="error-text" id="error-text"></div>
+    </div>
+
+    <section id="speakers-section" hidden>
+      <h2>Спикеры</h2>
+      <div class="speakers-list" id="speakers-list"></div>
+    </section>
+
+    <section id="export-section" hidden>
+      <h2>Экспорт</h2>
+      <div class="export-actions">
+        <a class="btn-outline" id="export-txt" href="#">Скачать .txt</a>
+        <a class="btn-outline" id="export-pdf" href="#">Скачать .pdf</a>
+        <a class="btn-outline" id="export-audio" href="#">Скачать аудио</a>
+      </div>
+    </section>
+
+    <section id="transcript-section" hidden>
+      <h2>Транскрипт</h2>
+      <div class="panel">
+        <div class="transcript" id="transcript">
+          <div class="placeholder" id="placeholder">Транскрипт появится здесь, как только будут готовы первые сегменты.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+<script>
+(() => {
+  const callId = new URLSearchParams(location.search).get('id');
+
+  const titleEl = document.getElementById('call-title');
+  const metaEl = document.getElementById('call-meta');
+  const statusPill = document.getElementById('call-status');
+  const statusText = document.getElementById('call-status-text');
+  const errorBox = document.getElementById('error-box');
+  const errorText = document.getElementById('error-text');
+  const speakersSection = document.getElementById('speakers-section');
+  const speakersList = document.getElementById('speakers-list');
+  const exportSection = document.getElementById('export-section');
+  const exportTxt = document.getElementById('export-txt');
+  const exportPdf = document.getElementById('export-pdf');
+  const exportAudio = document.getElementById('export-audio');
+  const transcriptSection = document.getElementById('transcript-section');
+  const transcript = document.getElementById('transcript');
+
+  const SOURCE_LABELS = {
+    mic: 'Очная встреча',
+    tab_capture: 'Онлайн-звонок',
+    upload: 'Загруженный файл',
+  };
+
+  const STATUS_LABELS = {
+    recording: 'Идёт запись',
+    processing: 'Обрабатывается',
+    done: 'Готово',
+    failed: 'Ошибка',
+  };
+
+  let pollTimer = null;
+  let editingSpeakerId = null;
+  let lastCall = null;
+
+  if (!callId) {
+    titleEl.textContent = 'Звонок не найден';
+    metaEl.textContent = 'В ссылке отсутствует параметр id.';
+    return;
+  }
+
+  function sourceLabel(source) {
+    return SOURCE_LABELS[source] || source || '—';
+  }
+
+  function statusLabel(status) {
+    return STATUS_LABELS[status] || status || '—';
+  }
+
+  function formatDuration(sec) {
+    if (sec === null || sec === undefined) return '—';
+    const total = Math.round(sec);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  function formatDate(raw) {
+    if (!raw) return '—';
+    let d = new Date(raw);
+    if (isNaN(d.getTime())) d = new Date(raw.replace(' ', 'T') + 'Z');
+    if (isNaN(d.getTime())) return raw;
+    return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function formatTime(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+  }
+
+  function buildSpeakerSlots(speakers) {
+    const map = new Map();
+    (speakers || []).forEach((sp, idx) => map.set(sp.id, idx + 1));
+    return map;
+  }
+
+  // Первые два спикера получают именные акцентные цвета (как в live.html),
+  // остальные — нейтральный цвет текста, чтобы не изобретать бесконечную палитру.
+  function speakerClass(slots, speakerId) {
+    if (speakerId === null || speakerId === undefined) return 's3';
+    const slot = slots.get(speakerId);
+    return slot && slot <= 2 ? `s${slot}` : 's3';
+  }
+
+  function renderSpeakers(call, slots) {
+    if (!call.speakers || !call.speakers.length) {
+      speakersSection.hidden = true;
+      return;
+    }
+    speakersSection.hidden = false;
+    speakersList.innerHTML = '';
+
+    call.speakers.forEach((sp) => {
+      const chip = document.createElement('span');
+      chip.className = `speaker-chip ${speakerClass(slots, sp.id)}`;
+      chip.dataset.speakerId = sp.id;
+
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      chip.appendChild(dot);
+
+      if (editingSpeakerId === sp.id) {
+        const input = document.createElement('input');
+        input.className = 'speaker-name-input';
+        input.value = sp.display_name || '';
+        chip.appendChild(input);
+        speakersList.appendChild(chip);
+        input.focus();
+        input.select();
+
+        const commit = () => {
+          const newName = input.value.trim();
+          editingSpeakerId = null;
+          if (newName && newName !== sp.display_name) {
+            saveSpeakerName(sp.id, newName);
+          } else {
+            renderAll(lastCall);
+          }
+        };
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+          if (e.key === 'Escape') { e.preventDefault(); editingSpeakerId = null; renderAll(lastCall); }
+        });
+        input.addEventListener('blur', commit);
+      } else {
+        const name = document.createElement('span');
+        name.className = 'speaker-name';
+        name.dataset.speakerId = sp.id;
+        name.textContent = sp.display_name || 'Без имени';
+        chip.appendChild(name);
+
+        const small = document.createElement('small');
+        small.textContent = ' изменить';
+        chip.appendChild(small);
+
+        chip.addEventListener('click', () => {
+          editingSpeakerId = sp.id;
+          renderAll(lastCall);
+        });
+        speakersList.appendChild(chip);
+      }
+    });
+  }
+
+  async function saveSpeakerName(speakerId, newName) {
+    try {
+      const res = await fetch(`/calls/${encodeURIComponent(callId)}/speakers/${encodeURIComponent(speakerId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: newName }),
+      });
+      if (!res.ok) throw new Error('rename failed');
+      const data = await res.json();
+
+      if (lastCall) {
+        const sp = lastCall.speakers.find((s) => s.id === speakerId);
+        if (sp) sp.display_name = data.display_name;
+        lastCall.segments.forEach((seg) => {
+          if (seg.speaker_id === speakerId) seg.speaker = data.display_name;
+        });
+      }
+
+      document.querySelectorAll(`[data-speaker-id="${CSS.escape(String(speakerId))}"].speaker-name`).forEach((el) => {
+        el.textContent = data.display_name;
+      });
+      renderAll(lastCall);
+    } catch (e) {
+      renderAll(lastCall);
+    }
+  }
+
+  function renderTranscript(call, slots) {
+    if (!call.segments || !call.segments.length) {
+      transcriptSection.hidden = false;
+      transcript.innerHTML = '<div class="placeholder">Транскрипт появится здесь, как только будут готовы первые сегменты.</div>';
+      return;
+    }
+
+    transcriptSection.hidden = false;
+
+    const wasAtBottom = transcript.scrollTop + transcript.clientHeight >= transcript.scrollHeight - 8;
+
+    const sorted = call.segments.slice().sort((a, b) => a.start_ms - b.start_ms);
+
+    transcript.innerHTML = sorted.map((seg) => {
+      const hasSpeaker = seg.speaker_id !== null && seg.speaker_id !== undefined;
+      const cls = hasSpeaker ? speakerClass(slots, seg.speaker_id) : 'none';
+      const speakerAttr = hasSpeaker ? ` data-speaker-id="${escapeHtml(seg.speaker_id)}"` : '';
+      const name = hasSpeaker ? (seg.speaker || 'Без имени') : '—';
+      const pendingTag = seg.is_final === false ? '<span class="pending-tag">уточняется…</span>' : '';
+
+      return `
+        <div class="turn ${cls}">
+          <div class="turn-head">
+            <div class="turn-head-left">
+              <span class="speaker ${cls}"${speakerAttr}>${escapeHtml(name)}</span>
+              ${pendingTag}
+            </div>
+            <span class="timecode">${formatTime(seg.start_ms)}</span>
+          </div>
+          <div class="text">${escapeHtml(seg.text)}</div>
+        </div>
+      `;
+    }).join('');
+
+    if (wasAtBottom) transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  function shouldPoll(call) {
+    const statusActive = call.status === 'recording' || call.status === 'processing';
+    const hasPending = (call.segments || []).some((s) => s.is_final === false);
+    return statusActive || hasPending;
+  }
+
+  function renderAll(call) {
+    lastCall = call;
+
+    titleEl.textContent = call.title || 'Без названия';
+    metaEl.innerHTML = `
+      <span>${escapeHtml(sourceLabel(call.source))}</span>
+      <span class="meta-sep" aria-hidden="true"></span>
+      <span>${escapeHtml(formatDate(call.created_at))}</span>
+      <span class="meta-sep" aria-hidden="true"></span>
+      <span>${escapeHtml(formatDuration(call.duration_sec))}</span>
+    `;
+
+    statusPill.className = `status-pill ${call.status}`;
+    statusText.textContent = statusLabel(call.status);
+
+    exportTxt.href = `/calls/${encodeURIComponent(callId)}/export?format=txt`;
+    exportPdf.href = `/calls/${encodeURIComponent(callId)}/export?format=pdf`;
+    exportAudio.href = `/calls/${encodeURIComponent(callId)}/audio`;
+
+    if (call.status === 'failed') {
+      errorBox.hidden = false;
+      errorText.textContent = call.error || 'Причина ошибки не указана.';
+      speakersSection.hidden = true;
+      exportSection.hidden = true;
+      transcriptSection.hidden = true;
+      return;
+    }
+
+    errorBox.hidden = true;
+    exportSection.hidden = false;
+
+    const slots = buildSpeakerSlots(call.speakers);
+    renderSpeakers(call, slots);
+    renderTranscript(call, slots);
+  }
+
+  async function fetchAndRender() {
+    try {
+      const res = await fetch(`/calls/${encodeURIComponent(callId)}`);
+      if (res.status === 404) {
+        titleEl.textContent = 'Звонок не найден';
+        metaEl.textContent = '';
+        statusPill.hidden = true;
+        clearInterval(pollTimer);
+        pollTimer = null;
+        return;
+      }
+      if (!res.ok) throw new Error('bad status');
+      const call = await res.json();
+      renderAll(call);
+
+      if (shouldPoll(call) && !pollTimer) {
+        pollTimer = setInterval(fetchAndRender, 4000);
+      } else if (!shouldPoll(call) && pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    } catch (e) {
+      // сеть моргнула — просто попробуем ещё раз на следующем тике поллинга
+    }
+  }
+
+  fetchAndRender();
+})();
+</script>
+</body>
+</html>

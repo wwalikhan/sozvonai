@@ -1,0 +1,39 @@
+[project]
+name = "sozvonai-backend"
+version = "0.1.0"
+description = "SozvonAI backend — локальная транскрибация и диаризация деловых звонков"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.9",
+    "faster-whisper>=1.2",
+    "nvidia-cublas-cu12",
+    "nvidia-cudnn-cu12",
+    "pyannote.audio>=3.3",
+    "python-dotenv>=1.0",
+    "silero-vad>=6.2",
+    "webrtcvad-wheels>=2.0.10",
+    "resemblyzer>=0.1.4",
+    "librosa>=0.10",
+    "fpdf2>=2.7",
+    "yt-dlp>=2026.8",
+    "llama-cpp-python>=0.3.35",
+]
+
+# resemblyzer официально зависит от "webrtcvad" (требует компилятор C++ на Windows) —
+# ставим "webrtcvad-wheels" (готовые wheels, тот же модуль `webrtcvad`) ДО resemblyzer,
+# затем `pip install resemblyzer --no-deps`, чтобы pip не пытался собрать webrtcvad сам.
+
+# torch с GPU(CUDA)-поддержкой НЕ ставится через обычный `pip install -e .` —
+# PyPI по умолчанию даёт CPU-сборку. Ставить отдельно под версию видеокарты/драйвера:
+#   pip install torch==<версия из "pip show torch"> --index-url https://download.pytorch.org/whl/cu130 --upgrade
+# (на этой машине сработал тег cu130 — см. docs/architecture.md §8)
+
+# llama-cpp-python: обычный PyPI sdist требует компилятор (CMake + MSVC) для сборки —
+# вместо этого ставим готовый CPU-wheel с индекса проекта:
+#   pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+# Модель (GGUF, не в git) — качается один раз в backend/.tools/models/, см. docs/tasks.md.
+
+[tool.setuptools]
+packages = ["app"]

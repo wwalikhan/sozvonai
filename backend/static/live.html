@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SozvonAI — живой звонок</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F6FA;
+    --surface: #FFFFFF;
+    --surface-sunken: #ECEEF5;
+    --ink: #171933;
+    --ink-soft: #6E7191;
+    --rule: #DFE1EC;
+    --primary: #3B3FE0;
+    --primary-soft: #EDEDFC;
+    --live: #FF5A36;
+    --live-soft: #FFE7E0;
+    --danger: #E0483B;
+    --speaker-a: #1F8A70;
+    --speaker-a-bg: #E6F3EF;
+    --speaker-b: #C77D24;
+    --speaker-b-bg: #F8ECDB;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12132A;
+      --surface: #1B1D3D;
+      --surface-sunken: #14152F;
+      --ink: #E9EAF7;
+      --ink-soft: #9A9CC4;
+      --rule: #34366099;
+      --rule: #33355C;
+      --primary: #8285FF;
+      --primary-soft: #292B58;
+      --live: #FF8064;
+      --live-soft: #3B2620;
+      --danger: #F0685C;
+      --speaker-a: #52C4A4;
+      --speaker-a-bg: #17332C;
+      --speaker-b: #E3AA5F;
+      --speaker-b-bg: #332715;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 36px 20px 90px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 22px;
+    margin-bottom: 30px;
+  }
+
+  .wordmark {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 24px;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  a { color: inherit; }
+
+  .btn-ghost {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    text-decoration: none;
+    padding: 8px 4px;
+    transition: color 0.15s ease;
+  }
+
+  .btn-ghost:hover { color: var(--primary); }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .status-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ink-soft);
+  }
+
+  .eq {
+    display: none;
+    align-items: flex-end;
+    gap: 2px;
+    height: 14px;
+  }
+
+  .eq i {
+    display: block;
+    width: 3px;
+    height: 100%;
+    background: var(--live);
+    border-radius: 2px;
+    transform-origin: bottom;
+    animation: eq-bounce 0.9s ease-in-out infinite;
+  }
+
+  .eq i:nth-child(1) { animation-delay: 0s; }
+  .eq i:nth-child(2) { animation-delay: 0.15s; }
+  .eq i:nth-child(3) { animation-delay: 0.3s; }
+  .eq i:nth-child(4) { animation-delay: 0.45s; }
+  .eq i:nth-child(5) { animation-delay: 0.6s; }
+
+  @keyframes eq-bounce {
+    0%, 100% { transform: scaleY(0.25); }
+    50% { transform: scaleY(1); }
+  }
+
+  .status.live .dot { display: none; }
+  .status.live .eq { display: flex; }
+  .status.live { color: var(--live); }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 1px 2px rgba(23, 25, 51, 0.05), 0 16px 32px -20px rgba(59, 63, 224, 0.35);
+  }
+
+  .transcript {
+    background: var(--surface-sunken);
+    border-radius: 14px;
+    padding: 8px 22px;
+    min-height: 320px;
+    max-height: 56vh;
+    overflow-y: auto;
+  }
+
+  .placeholder {
+    color: var(--ink-soft);
+    font-size: 15px;
+    padding: 48px 12px;
+    text-align: center;
+  }
+
+  .turn {
+    padding: 16px 18px;
+    margin: 10px 0;
+    border-left: 3px solid var(--ink-soft);
+    border-radius: 0 10px 10px 0;
+    background: var(--surface);
+    animation: fade-in 0.35s ease-out;
+  }
+
+  .turn.s1 { border-left-color: var(--speaker-a); }
+  .turn.s2 { border-left-color: var(--speaker-b); }
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .turn-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 5px;
+    flex-wrap: wrap;
+  }
+
+  .speaker {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  .speaker.s1 { color: var(--speaker-a); }
+  .speaker.s2 { color: var(--speaker-b); }
+  .speaker.s3 { color: var(--ink); }
+
+  .timecode {
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .text {
+    font-size: 16px;
+    line-height: 1.55;
+    max-width: 62ch;
+  }
+
+  .mode-select {
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    margin: 32px auto 0;
+    background: var(--surface-sunken);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: 4px;
+    gap: 4px;
+    transition: opacity 0.15s ease;
+  }
+
+  .mode-select.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .mode-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .mode-option input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    pointer-events: none;
+  }
+
+  .mode-option:has(input:checked) {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .mode-option:has(input:focus-visible) {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    margin-top: 24px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 12px;
+    padding: 15px 36px;
+    cursor: pointer;
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 10px 24px -10px rgba(59, 63, 224, 0.55);
+    transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  button:hover { transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+
+  button.recording {
+    background: var(--live);
+    box-shadow: 0 10px 24px -10px rgba(255, 90, 54, 0.55);
+  }
+
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .hint {
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 13px;
+    margin-top: 14px;
+  }
+
+  .hint.error {
+    color: var(--danger);
+  }
+
+  @media (max-width: 520px) {
+    .panel { padding: 12px; border-radius: 16px; }
+    .transcript { padding: 6px 14px; }
+    button { width: 100%; }
+    .mode-select { width: 100%; }
+    .mode-option { flex: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .eq i { animation: none; height: 55%; }
+    .turn { animation: none; }
+    button { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="wordmark">SozvonAI</div>
+      <div class="nav-actions">
+        <a class="btn-ghost" href="calls.html">Мои звонки</a>
+        <a class="btn-ghost" href="videos.html">Видео-инсайты</a>
+        <div class="status" id="status">
+          <span class="status-indicator" aria-hidden="true">
+            <span class="dot"></span>
+            <span class="eq"><i></i><i></i><i></i><i></i><i></i></span>
+          </span>
+          <span id="status-text">Не записывается</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="panel">
+      <div class="transcript" id="transcript">
+        <div class="placeholder" id="placeholder">Нажмите «Начать звонок» — текст будет появляться здесь по ходу разговора.</div>
+      </div>
+    </div>
+
+    <div class="mode-select" id="mode-select">
+      <label class="mode-option">
+        <input type="radio" name="call-mode" value="in-person" checked>
+        <span>Очная встреча</span>
+      </label>
+      <label class="mode-option">
+        <input type="radio" name="call-mode" value="online">
+        <span>Онлайн-звонок</span>
+      </label>
+    </div>
+
+    <div class="controls">
+      <button id="toggle">Начать звонок</button>
+    </div>
+    <div class="hint" id="hint">Понадобится доступ к микрофону.</div>
+    <div class="hint" id="call-link-wrap" hidden><a class="btn-ghost" id="call-link" href="#">Открыть эту запись со скачиванием →</a></div>
+  </div>
+
+<script>
+(() => {
+  const toggleBtn = document.getElementById('toggle');
+  const statusEl = document.getElementById('status');
+  const statusText = document.getElementById('status-text');
+  const transcript = document.getElementById('transcript');
+  const placeholder = document.getElementById('placeholder');
+  const hint = document.getElementById('hint');
+  const callLinkWrap = document.getElementById('call-link-wrap');
+  const callLink = document.getElementById('call-link');
+  const modeSelect = document.getElementById('mode-select');
+  const modeInputs = Array.from(document.querySelectorAll('input[name="call-mode"]'));
+
+  class StartError extends Error {}
+
+  // Состояние захвата: микрофон всегда участвует; вкладка/экран — только в режиме "online".
+  let audioContext, micStream, displayStream;
+  let micSourceNode, displaySourceNode, mixNode, monitorGain, processorNode, ws;
+  let startedAt = 0;
+  let timerInterval;
+  const speakerSlot = new Map();
+  // Пока говорит один и тот же спикер подряд (без вклинивания собеседника), реплики
+  // визуально склеиваются в один пузырь — бэкенд может присылать длинную фразу
+  // несколькими сегментами подряд (чтобы не ждать полной тишины перед показом текста),
+  // но для читателя это одна мысль одного человека.
+  let lastTurnEl = null;
+  let lastTurnSpeaker = null;
+  let currentCallId = null;
+
+  function getSelectedMode() {
+    const checked = modeInputs.find((el) => el.checked);
+    return checked ? checked.value : 'in-person';
+  }
+
+  function setModeInputsDisabled(disabled) {
+    modeInputs.forEach((el) => { el.disabled = disabled; });
+    modeSelect.classList.toggle('disabled', disabled);
+  }
+
+  function updateHintForMode() {
+    hint.classList.remove('error');
+    hint.textContent = getSelectedMode() === 'online'
+      ? 'Понадобится доступ к звуку вкладки/экрана (с галочкой «Поделиться звуком») и к микрофону.'
+      : 'Понадобится доступ к микрофону.';
+  }
+
+  modeInputs.forEach((input) => {
+    input.addEventListener('change', () => {
+      if (!toggleBtn.classList.contains('recording')) updateHintForMode();
+    });
+  });
+
+  function speakerClass(name) {
+    if (!speakerSlot.has(name)) speakerSlot.set(name, speakerSlot.size + 1);
+    const slot = speakerSlot.get(name);
+    return slot <= 2 ? `s${slot}` : 's3';
+  }
+
+  function formatTime(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  function appendTurn(msg) {
+    if (placeholder) { placeholder.remove(); }
+
+    if (lastTurnEl && lastTurnSpeaker === msg.speaker) {
+      const textEl = lastTurnEl.querySelector('.text');
+      textEl.textContent = `${textEl.textContent} ${msg.text}`;
+      transcript.scrollTop = transcript.scrollHeight;
+      return;
+    }
+
+    const cls = speakerClass(msg.speaker);
+    const turn = document.createElement('div');
+    turn.className = `turn ${cls}`;
+    turn.innerHTML = `
+      <div class="turn-head">
+        <span class="speaker ${cls}">${msg.speaker}</span>
+        <span class="timecode">${formatTime(msg.start_ms)}</span>
+      </div>
+      <div class="text"></div>
+    `;
+    turn.querySelector('.text').textContent = msg.text;
+    transcript.appendChild(turn);
+    lastTurnEl = turn;
+    lastTurnSpeaker = msg.speaker;
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  function showError(text) {
+    hint.textContent = text;
+    hint.classList.add('error');
+  }
+
+  function floatTo16BitPCM(float32Array) {
+    const out = new Int16Array(float32Array.length);
+    for (let i = 0; i < float32Array.length; i++) {
+      const s = Math.max(-1, Math.min(1, float32Array[i]));
+      out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return out;
+  }
+
+  function updateTimer() {
+    statusText.textContent = `Запись — ${formatTime(Date.now() - startedAt)}`;
+  }
+
+  // Если один из захваченных треков завершится сам по себе (пользователь нажал
+  // «Остановить показ» в шторке браузера, отозвал доступ к микрофону и т.п.) —
+  // останавливаем звонок целиком и явно объясняем причину, вместо тихого зависания.
+  function attachEndedWatcher(tracks, message) {
+    tracks.forEach((track) => {
+      track.addEventListener('ended', () => {
+        if (toggleBtn.classList.contains('recording')) {
+          stop();
+          showError(message);
+        }
+      });
+    });
+  }
+
+  // Полная остановка и освобождение всего, что могло быть захвачено на любом этапе
+  // start() — вызывается и при штатной остановке, и при ошибке на середине старта.
+  function releaseCaptured() {
+    if (processorNode) { processorNode.disconnect(); processorNode.onaudioprocess = null; processorNode = null; }
+    if (monitorGain) { monitorGain.disconnect(); monitorGain = null; }
+    if (mixNode) { mixNode.disconnect(); mixNode = null; }
+    if (micSourceNode) { micSourceNode.disconnect(); micSourceNode = null; }
+    if (displaySourceNode) { displaySourceNode.disconnect(); displaySourceNode = null; }
+    if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
+    if (displayStream) { displayStream.getTracks().forEach((t) => t.stop()); displayStream = null; }
+    if (audioContext) { audioContext.close().catch(() => {}); audioContext = null; }
+    if (ws) { try { ws.close(); } catch (e) { /* ignore */ } ws = null; }
+  }
+
+  async function start() {
+    toggleBtn.disabled = true;
+    setModeInputsDisabled(true);
+    hint.classList.remove('error');
+    // Новый звонок — новый отсчёт склейки пузырьков, чтобы первая реплика не
+    // приклеилась к последнему пузырю от предыдущего звонка на этой странице.
+    lastTurnEl = null;
+    lastTurnSpeaker = null;
+    callLinkWrap.hidden = true;
+
+    const mode = getSelectedMode();
+
+    try {
+      if (mode === 'online') {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+          throw new StartError('Захват звука вкладки не поддерживается этим браузером (обычно это Firefox). Используйте Chrome/Edge, либо загрузите готовую запись звонка.');
+        }
+
+        hint.textContent = 'Выберите вкладку/экран со звонком и поставьте галочку «Поделиться звуком»…';
+        try {
+          // video:true нужен, чтобы браузер вообще показал диалог выбора источника
+          // с чекбоксом «Поделиться звуком» — видеодорожку сразу останавливаем ниже.
+          displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        } catch (e) {
+          throw new StartError('Не удалось получить доступ к звуку вкладки/экрана. Попробуйте снова и обязательно поставьте галочку «Поделиться звуком», либо загрузите готовую запись звонка.');
+        }
+
+        displayStream.getVideoTracks().forEach((t) => t.stop());
+
+        if (displayStream.getAudioTracks().length === 0) {
+          displayStream.getTracks().forEach((t) => t.stop());
+          displayStream = null;
+          throw new StartError('В выбранном источнике не найден звук. При выборе вкладки/экрана обязательно поставьте галочку «Поделиться звуком вкладки», иначе используйте загрузку готовой записи.');
+        }
+
+        hint.textContent = 'Запрашиваем доступ к микрофону…';
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+          throw new StartError('Нет доступа к микрофону. Разрешите доступ и попробуйте снова, либо загрузите файл записи.');
+        }
+      } else {
+        hint.textContent = 'Запрашиваем доступ к микрофону…';
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+          throw new StartError('Нет доступа к микрофону. Разрешите доступ и попробуйте снова, либо загрузите файл записи.');
+        }
+      }
+
+      audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+
+      // Оба источника (мик + вкладка) сводятся в один GainNode до единственного
+      // ScriptProcessorNode — на выходе всегда один моно-канал 16kHz PCM.
+      mixNode = audioContext.createGain();
+      micSourceNode = audioContext.createMediaStreamSource(micStream);
+      micSourceNode.connect(mixNode);
+
+      if (mode === 'online') {
+        displaySourceNode = audioContext.createMediaStreamSource(displayStream);
+        displaySourceNode.connect(mixNode);
+      }
+
+      processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+      mixNode.connect(processorNode);
+
+      // ScriptProcessorNode должен быть подключён к destination, чтобы вообще
+      // получать колбэки onaudioprocess в части браузеров. В online-режиме звук
+      // вкладки уже играет в самой вкладке — если пустить микс на колонки ещё раз,
+      // будет заметное эхо/дублирование, поэтому глушим локальный мониторинг.
+      monitorGain = audioContext.createGain();
+      monitorGain.gain.value = mode === 'online' ? 0 : 1;
+      processorNode.connect(monitorGain);
+      monitorGain.connect(audioContext.destination);
+
+      currentCallId = crypto.randomUUID();
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsSource = mode === 'online' ? 'tab_capture' : 'mic';
+      ws = new WebSocket(`${proto}://${location.host}/ws/stream/${currentCallId}?source=${wsSource}`);
+      ws.binaryType = 'arraybuffer';
+
+      await new Promise((resolve, reject) => {
+        ws.onopen = () => resolve();
+        ws.onerror = () => reject(new StartError('Не удалось установить соединение с сервером. Попробуйте начать звонок заново.'));
+      });
+
+      processorNode.onaudioprocess = (event) => {
+        const input = event.inputBuffer.getChannelData(0);
+        const pcm16 = floatTo16BitPCM(input);
+        if (ws.readyState === WebSocket.OPEN) ws.send(pcm16.buffer);
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'segment') appendTurn(msg);
+      };
+      ws.onerror = () => showError('Соединение прервано. Попробуйте начать звонок заново.');
+
+      attachEndedWatcher(micStream.getAudioTracks(), 'Доступ к микрофону был отозван. Запись остановлена.');
+      if (mode === 'online') {
+        attachEndedWatcher(displayStream.getAudioTracks(), 'Показ вкладки/экрана был остановлен. Запись остановлена.');
+      }
+
+      startedAt = Date.now();
+      timerInterval = setInterval(updateTimer, 1000);
+      statusEl.classList.add('live');
+      updateTimer();
+      hint.textContent = mode === 'online'
+        ? 'Идёт запись звонка (вкладка + микрофон). Текст появится ниже.'
+        : 'Идёт запись. Говорите — текст появится ниже.';
+      toggleBtn.textContent = 'Остановить';
+      toggleBtn.classList.add('recording');
+      toggleBtn.disabled = false;
+    } catch (err) {
+      releaseCaptured();
+      showError(err instanceof StartError ? err.message : 'Не удалось начать запись. Попробуйте снова.');
+      setModeInputsDisabled(false);
+      toggleBtn.disabled = false;
+    }
+  }
+
+  function stop() {
+    toggleBtn.disabled = true;
+    releaseCaptured();
+    clearInterval(timerInterval);
+
+    statusEl.classList.remove('live');
+    statusText.textContent = 'Не записывается';
+    setModeInputsDisabled(false);
+    updateHintForMode();
+    toggleBtn.textContent = 'Начать звонок';
+    toggleBtn.classList.remove('recording');
+    toggleBtn.disabled = false;
+
+    if (currentCallId) {
+      callLink.href = `call.html?id=${encodeURIComponent(currentCallId)}`;
+      callLinkWrap.hidden = false;
+    }
+  }
+
+  toggleBtn.addEventListener('click', () => {
+    if (toggleBtn.classList.contains('recording')) stop(); else start();
+  });
+
+  updateHintForMode();
+})();
+</script>
+</body>
+</html>

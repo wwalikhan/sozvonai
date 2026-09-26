@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SozvonAI — видео-инсайт</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F6FA;
+    --surface: #FFFFFF;
+    --surface-sunken: #ECEEF5;
+    --ink: #171933;
+    --ink-soft: #6E7191;
+    --rule: #DFE1EC;
+    --primary: #3B3FE0;
+    --primary-soft: #EDEDFC;
+    --ok: #1F8A70;
+    --ok-bg: #E6F3EF;
+    --warn: #C77D24;
+    --warn-bg: #F8ECDB;
+    --danger: #E0483B;
+    --danger-bg: #FBE3E1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12132A;
+      --surface: #1B1D3D;
+      --surface-sunken: #14152F;
+      --ink: #E9EAF7;
+      --ink-soft: #9A9CC4;
+      --rule: #33355C;
+      --primary: #8285FF;
+      --primary-soft: #292B58;
+      --ok: #52C4A4;
+      --ok-bg: #17332C;
+      --warn: #E3AA5F;
+      --warn-bg: #332715;
+      --danger: #F0685C;
+      --danger-bg: #3B211E;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+
+  .page { max-width: 760px; margin: 0 auto; padding: 36px 20px 90px; }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 22px;
+    margin-bottom: 30px;
+  }
+
+  .wordmark { font-family: 'Fraunces', serif; font-weight: 600; font-size: 24px; letter-spacing: -0.01em; }
+
+  .nav-actions { display: flex; align-items: center; gap: 18px; }
+
+  a { color: inherit; }
+
+  .btn-ghost {
+    font-size: 14px; font-weight: 500; color: var(--ink-soft); text-decoration: none;
+    cursor: pointer; background: none; border: none; font-family: inherit; padding: 8px 4px;
+    transition: color 0.15s ease;
+  }
+  .btn-ghost:hover { color: var(--primary); }
+
+  .btn-primary {
+    display: inline-block; font-family: inherit; font-size: 14px; font-weight: 600;
+    text-decoration: none; border: none; border-radius: 10px; padding: 11px 20px; cursor: pointer;
+    background: var(--primary); color: #fff; box-shadow: 0 8px 20px -10px rgba(59, 63, 224, 0.55);
+    transition: transform 0.15s ease;
+  }
+  .btn-primary:hover { transform: translateY(-1px); }
+
+  .btn-outline {
+    display: inline-flex; align-items: center; gap: 6px; font-family: inherit; font-size: 14px;
+    font-weight: 500; text-decoration: none; border: 1px solid var(--rule); border-radius: 10px;
+    padding: 9px 16px; cursor: pointer; background: var(--surface); color: var(--ink);
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+
+  .video-header { margin-bottom: 30px; }
+
+  .video-header h1 {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 28px; margin: 0 0 12px;
+    letter-spacing: -0.01em; word-break: break-word;
+  }
+
+  .video-meta-line {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px;
+    color: var(--ink-soft); margin-bottom: 14px;
+  }
+
+  .video-meta-line a { color: var(--primary); text-decoration: none; }
+  .video-meta-line a:hover { text-decoration: underline; }
+
+  .meta-sep { width: 1px; height: 12px; background: var(--rule); flex-shrink: 0; }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600;
+    padding: 6px 14px; border-radius: 999px; color: var(--ink-soft); background: var(--surface-sunken);
+  }
+  .status-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-soft); flex-shrink: 0; }
+  .status-pill.processing { color: var(--warn); background: var(--warn-bg); }
+  .status-pill.processing .dot { background: var(--warn); animation: pulse 1.6s ease-in-out infinite; }
+  .status-pill.done { color: var(--ok); background: var(--ok-bg); }
+  .status-pill.done .dot { background: var(--ok); }
+  .status-pill.failed { color: var(--danger); background: var(--danger-bg); }
+  .status-pill.failed .dot { background: var(--danger); }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.85); } }
+
+  .error-box {
+    background: var(--surface); border: 1px solid var(--danger); border-radius: 16px;
+    padding: 20px 24px; margin-bottom: 30px;
+  }
+  .error-box strong { display: block; color: var(--danger); font-family: 'Fraunces', serif; font-weight: 600; font-size: 16px; margin-bottom: 6px; }
+  .error-box .error-text { font-size: 14px; color: var(--ink-soft); }
+
+  .processing-note {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 16px;
+    padding: 20px 24px; margin-bottom: 30px; color: var(--ink-soft); font-size: 14px;
+  }
+
+  section { margin-bottom: 34px; }
+  section h2 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 17px; margin: 0 0 14px; }
+
+  .export-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 20px; padding: 22px;
+    box-shadow: 0 1px 2px rgba(23, 25, 51, 0.05), 0 16px 32px -20px rgba(59, 63, 224, 0.35);
+  }
+
+  .summary-text, .transcript-text {
+    font-size: 16px; line-height: 1.65; white-space: pre-wrap;
+  }
+
+  .transcript-panel {
+    background: var(--surface-sunken); border-radius: 14px; padding: 18px 22px;
+    max-height: 46vh; overflow-y: auto;
+  }
+
+  .transcript-text { font-size: 15px; color: var(--ink-soft); line-height: 1.6; }
+
+  @media (max-width: 520px) {
+    .panel { padding: 14px; border-radius: 16px; }
+    .export-actions { flex-wrap: wrap; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .status-pill.processing .dot { animation: none; }
+    .btn-primary, .btn-outline { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="wordmark">SozvonAI</div>
+      <div class="nav-actions">
+        <a class="btn-ghost" href="videos.html">Все видео</a>
+        <a class="btn-primary" href="videos.html">Новое видео</a>
+      </div>
+    </header>
+
+    <div class="video-header">
+      <h1 id="video-title">Загрузка…</h1>
+      <div class="video-meta-line" id="video-meta"></div>
+      <span class="status-pill" id="video-status"><span class="dot"></span><span id="video-status-text">—</span></span>
+    </div>
+
+    <div class="error-box" id="error-box" hidden>
+      <strong>Не удалось обработать видео</strong>
+      <div class="error-text" id="error-text"></div>
+    </div>
+
+    <div class="processing-note" id="processing-note" hidden>
+      Скачиваем аудио, распознаём речь и составляем отчёт — для короткого ролика это пара минут, для длинного (десятки минут) может занять и десять-пятнадцать: суммаризация считается на процессоре. Страница обновится сама, можно закрыть вкладку и вернуться позже.
+    </div>
+
+    <section id="export-section" hidden>
+      <h2>Экспорт</h2>
+      <div class="export-actions">
+        <button class="btn-outline" id="export-txt" type="button">Скачать .txt</button>
+      </div>
+    </section>
+
+    <section id="summary-section" hidden>
+      <h2>Ключевые мысли</h2>
+      <div class="panel">
+        <div class="summary-text" id="summary-text"></div>
+      </div>
+    </section>
+
+    <section id="transcript-section" hidden>
+      <h2>Полный транскрипт</h2>
+      <div class="transcript-panel">
+        <div class="transcript-text" id="transcript-text"></div>
+      </div>
+    </section>
+  </div>
+
+<script>
+(() => {
+  const videoId = new URLSearchParams(location.search).get('id');
+
+  const titleEl = document.getElementById('video-title');
+  const metaEl = document.getElementById('video-meta');
+  const statusPill = document.getElementById('video-status');
+  const statusText = document.getElementById('video-status-text');
+  const errorBox = document.getElementById('error-box');
+  const errorText = document.getElementById('error-text');
+  const processingNote = document.getElementById('processing-note');
+  const exportSection = document.getElementById('export-section');
+  const exportTxtBtn = document.getElementById('export-txt');
+  const summarySection = document.getElementById('summary-section');
+  const summaryText = document.getElementById('summary-text');
+  const transcriptSection = document.getElementById('transcript-section');
+  const transcriptText = document.getElementById('transcript-text');
+
+  const STATUS_LABELS = {
+    processing: 'Обрабатывается',
+    done: 'Готово',
+    failed: 'Ошибка',
+  };
+
+  let pollTimer = null;
+  let lastVideo = null;
+
+  if (!videoId) {
+    titleEl.textContent = 'Видео не найдено';
+    metaEl.textContent = 'В ссылке отсутствует параметр id.';
+    return;
+  }
+
+  function statusLabel(status) {
+    return STATUS_LABELS[status] || status || '—';
+  }
+
+  function formatDuration(sec) {
+    if (sec === null || sec === undefined) return '—';
+    const total = Math.round(sec);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  function formatDate(raw) {
+    if (!raw) return '—';
+    let d = new Date(raw);
+    if (isNaN(d.getTime())) d = new Date(raw.replace(' ', 'T') + 'Z');
+    if (isNaN(d.getTime())) return raw;
+    return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+  }
+
+  function downloadText(filename, text) {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  exportTxtBtn.addEventListener('click', () => {
+    if (!lastVideo) return;
+    const parts = [
+      lastVideo.title || lastVideo.url,
+      '',
+      '=== Ключевые мысли ===',
+      lastVideo.summary || '',
+      '',
+      '=== Полный транскрипт ===',
+      lastVideo.transcript || '',
+    ];
+    downloadText(`${(lastVideo.title || 'video').slice(0, 60)}.txt`, parts.join('\n'));
+  });
+
+  function renderAll(video) {
+    lastVideo = video;
+
+    titleEl.textContent = video.title || video.url;
+    metaEl.innerHTML = `
+      <a href="${escapeHtml(video.url)}" target="_blank" rel="noopener">Открыть на YouTube ↗</a>
+      <span class="meta-sep" aria-hidden="true"></span>
+      <span>${escapeHtml(formatDate(video.created_at))}</span>
+      <span class="meta-sep" aria-hidden="true"></span>
+      <span>${escapeHtml(formatDuration(video.duration_sec))}</span>
+    `;
+
+    statusPill.className = `status-pill ${video.status}`;
+    statusText.textContent = statusLabel(video.status);
+
+    if (video.status === 'failed') {
+      errorBox.hidden = false;
+      errorText.textContent = video.error || 'Причина ошибки не указана.';
+      processingNote.hidden = true;
+      exportSection.hidden = true;
+      summarySection.hidden = true;
+      transcriptSection.hidden = true;
+      return;
+    }
+
+    errorBox.hidden = true;
+
+    if (video.status === 'processing') {
+      processingNote.hidden = false;
+      exportSection.hidden = true;
+      summarySection.hidden = true;
+      transcriptSection.hidden = true;
+      return;
+    }
+
+    processingNote.hidden = true;
+    exportSection.hidden = false;
+
+    summarySection.hidden = !video.summary;
+    summaryText.textContent = video.summary || '';
+
+    transcriptSection.hidden = !video.transcript;
+    transcriptText.textContent = video.transcript || '';
+  }
+
+  async function fetchAndRender() {
+    try {
+      const res = await fetch(`/videos/${encodeURIComponent(videoId)}`);
+      if (res.status === 404) {
+        titleEl.textContent = 'Видео не найдено';
+        metaEl.textContent = '';
+        statusPill.hidden = true;
+        clearInterval(pollTimer);
+        pollTimer = null;
+        return;
+      }
+      if (!res.ok) throw new Error('bad status');
+      const video = await res.json();
+      renderAll(video);
+
+      if (video.status === 'processing' && !pollTimer) {
+        pollTimer = setInterval(fetchAndRender, 4000);
+      } else if (video.status !== 'processing' && pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    } catch (e) {
+      // сеть моргнула — попробуем ещё раз на следующем тике поллинга
+    }
+  }
+
+  fetchAndRender();
+})();
+</script>
+</body>
+</html>

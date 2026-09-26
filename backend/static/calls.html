@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SozvonAI — звонки</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F6FA;
+    --surface: #FFFFFF;
+    --surface-sunken: #ECEEF5;
+    --ink: #171933;
+    --ink-soft: #6E7191;
+    --rule: #DFE1EC;
+    --primary: #3B3FE0;
+    --primary-soft: #EDEDFC;
+    --live: #FF5A36;
+    --live-soft: #FFE7E0;
+    --speaker-a: #1F8A70;
+    --speaker-a-bg: #E6F3EF;
+    --speaker-b: #C77D24;
+    --speaker-b-bg: #F8ECDB;
+    --ok: #1F8A70;
+    --ok-bg: #E6F3EF;
+    --warn: #C77D24;
+    --warn-bg: #F8ECDB;
+    --danger: #E0483B;
+    --danger-bg: #FBE3E1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12132A;
+      --surface: #1B1D3D;
+      --surface-sunken: #14152F;
+      --ink: #E9EAF7;
+      --ink-soft: #9A9CC4;
+      --rule: #33355C;
+      --primary: #8285FF;
+      --primary-soft: #292B58;
+      --live: #FF8064;
+      --live-soft: #3B2620;
+      --speaker-a: #52C4A4;
+      --speaker-a-bg: #17332C;
+      --speaker-b: #E3AA5F;
+      --speaker-b-bg: #332715;
+      --ok: #52C4A4;
+      --ok-bg: #17332C;
+      --warn: #E3AA5F;
+      --warn-bg: #332715;
+      --danger: #F0685C;
+      --danger-bg: #3B211E;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 32px 20px 90px;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding-bottom: 20px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .wordmark {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 24px;
+    letter-spacing: -0.01em;
+  }
+
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  a { color: inherit; }
+
+  .btn-ghost {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    text-decoration: none;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+    padding: 8px 4px;
+    transition: color 0.15s ease;
+  }
+
+  .btn-ghost:hover { color: var(--primary); }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    border-radius: 10px;
+    padding: 11px 20px;
+    cursor: pointer;
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 8px 20px -10px rgba(59, 63, 224, 0.55);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  }
+
+  .btn-primary:hover { transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
+
+  .page-intro { margin-bottom: 28px; }
+
+  .page-intro h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 32px;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+
+  .page-intro p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 15px;
+    max-width: 56ch;
+  }
+
+  section { margin-bottom: 30px; }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .section-head h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 19px;
+    margin: 0;
+  }
+
+  .surface-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 18px;
+    padding: 22px;
+  }
+
+  .upload-card {
+    background: var(--surface-sunken);
+    border: 2px dashed var(--rule);
+    border-radius: 14px;
+    padding: 36px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .upload-card:hover,
+  .upload-card.dragover {
+    border-color: var(--primary);
+    background: var(--primary-soft);
+    box-shadow: 0 16px 32px -22px rgba(59, 63, 224, 0.5);
+  }
+
+  .upload-icon {
+    color: var(--ink-soft);
+    margin-bottom: 14px;
+    transition: color 0.15s ease;
+  }
+
+  .upload-card:hover .upload-icon,
+  .upload-card.dragover .upload-icon {
+    color: var(--primary);
+  }
+
+  .upload-text {
+    font-size: 15px;
+    color: var(--ink-soft);
+  }
+
+  .upload-text strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .upload-filename {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    min-height: 20px;
+  }
+
+  .upload-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 18px;
+  }
+
+  .upload-status {
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+
+  .upload-status.error { color: var(--danger); }
+  .upload-status.ok { color: var(--ok); }
+
+  .storage-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .storage-info svg { flex-shrink: 0; }
+
+  .storage-path {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl;
+    text-align: left;
+  }
+
+  .storage-info .btn-ghost {
+    flex-shrink: 0;
+    padding: 4px 2px;
+  }
+
+  .calls-list {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 18px;
+    overflow: hidden;
+  }
+
+  .placeholder {
+    color: var(--ink-soft);
+    font-size: 15px;
+    padding: 44px 20px;
+    text-align: center;
+  }
+
+  .call-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--rule);
+    transition: background 0.15s ease;
+  }
+
+  .call-row:hover { background: var(--surface-sunken); }
+  .call-row:last-child { border-bottom: none; }
+
+  .call-main {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .call-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 17px;
+    margin-bottom: 5px;
+  }
+
+  .call-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .meta-sep {
+    width: 1px;
+    height: 12px;
+    background: var(--rule);
+    flex-shrink: 0;
+  }
+
+  .error-inline {
+    color: var(--danger);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    margin-top: 4px;
+    font-size: 13px;
+    max-width: 56ch;
+  }
+
+  .call-side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 7px;
+    min-width: 132px;
+    flex-shrink: 0;
+    padding-top: 1px;
+  }
+
+  .call-side-top {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .delete-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-soft);
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .delete-btn:hover {
+    background: var(--danger-bg);
+    color: var(--danger);
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 999px;
+    color: var(--ink-soft);
+    background: var(--surface-sunken);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .status-pill .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ink-soft);
+    flex-shrink: 0;
+  }
+
+  .status-pill.recording { color: var(--live); background: var(--live-soft); }
+  .status-pill.recording .dot { background: var(--live); animation: pulse 1.6s ease-in-out infinite; }
+  .status-pill.processing { color: var(--warn); background: var(--warn-bg); }
+  .status-pill.processing .dot { background: var(--warn); animation: pulse 1.6s ease-in-out infinite; }
+  .status-pill.done { color: var(--ok); background: var(--ok-bg); }
+  .status-pill.done .dot { background: var(--ok); }
+  .status-pill.failed { color: var(--danger); background: var(--danger-bg); }
+  .status-pill.failed .dot { background: var(--danger); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.45; transform: scale(0.85); }
+  }
+
+  .call-duration {
+    font-size: 13px;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 560px) {
+    .call-row { flex-wrap: wrap; }
+    .call-side { flex-direction: row-reverse; align-items: center; min-width: 0; width: 100%; justify-content: flex-end; }
+    .upload-card { padding: 32px 16px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .status-pill.recording .dot,
+    .status-pill.processing .dot { animation: none; }
+    .btn-primary, .upload-card { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="wordmark">SozvonAI</div>
+      <div class="nav-actions">
+        <a class="btn-ghost" href="videos.html">Видео-инсайты</a>
+        <button class="btn-ghost" id="refresh-btn" type="button">Обновить</button>
+        <a class="btn-primary" href="live.html">Начать новый звонок</a>
+      </div>
+    </header>
+
+    <div class="page-intro">
+      <h1>Звонки</h1>
+      <p>Загрузите запись встречи или начните живой звонок — расшифровка по спикерам появится в списке ниже.</p>
+    </div>
+
+    <section>
+      <div class="section-head"><h2>Загрузить запись</h2></div>
+      <div class="surface-card">
+        <div class="upload-card" id="dropzone">
+          <input type="file" id="file-input" hidden>
+          <svg class="upload-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 16V4"></path>
+            <path d="M7 9l5-5 5 5"></path>
+            <path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"></path>
+          </svg>
+          <div class="upload-text"><strong>Перетащите файл сюда</strong> или нажмите, чтобы выбрать</div>
+          <div class="upload-filename" id="upload-filename"></div>
+        </div>
+        <div class="upload-actions">
+          <button class="btn-primary" id="upload-btn" type="button" disabled>Загрузить</button>
+          <span class="upload-status" id="upload-status"></span>
+        </div>
+        <div class="storage-info">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path>
+          </svg>
+          <span class="storage-path" id="storage-path">Загружаем путь…</span>
+          <button class="btn-ghost" id="open-folder-btn" type="button">Открыть папку</button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>История звонков</h2>
+      </div>
+      <div class="calls-list" id="calls-list">
+        <div class="placeholder">Загружаем список…</div>
+      </div>
+    </section>
+  </div>
+
+<script>
+(() => {
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('file-input');
+  const uploadFilename = document.getElementById('upload-filename');
+  const uploadBtn = document.getElementById('upload-btn');
+  const uploadStatus = document.getElementById('upload-status');
+  const callsList = document.getElementById('calls-list');
+  const refreshBtn = document.getElementById('refresh-btn');
+  const storagePathEl = document.getElementById('storage-path');
+  const openFolderBtn = document.getElementById('open-folder-btn');
+
+  const SOURCE_LABELS = {
+    mic: 'Очная встреча',
+    tab_capture: 'Онлайн-звонок',
+    upload: 'Загруженный файл',
+  };
+
+  const STATUS_LABELS = {
+    recording: 'Идёт запись',
+    processing: 'Обрабатывается',
+    done: 'Готово',
+    failed: 'Ошибка',
+  };
+
+  let selectedFile = null;
+  let pollTimer = null;
+
+  function sourceLabel(source) {
+    return SOURCE_LABELS[source] || source || '—';
+  }
+
+  function statusLabel(status) {
+    return STATUS_LABELS[status] || status || '—';
+  }
+
+  function formatDuration(sec) {
+    if (sec === null || sec === undefined) return '—';
+    const total = Math.round(sec);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  }
+
+  function formatDate(raw) {
+    if (!raw) return '—';
+    let d = new Date(raw);
+    if (isNaN(d.getTime())) {
+      d = new Date(raw.replace(' ', 'T') + 'Z');
+    }
+    if (isNaN(d.getTime())) return raw;
+    return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+  }
+
+  function renderCalls(calls) {
+    if (!calls.length) {
+      callsList.innerHTML = '<div class="placeholder">Пока нет ни одного звонка. Загрузите файл или начните живой звонок.</div>';
+      return;
+    }
+
+    const sorted = calls.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+
+    callsList.innerHTML = sorted.map((call) => {
+      const title = escapeHtml(call.title || 'Без названия');
+      const errorLine = call.status === 'failed' && call.error
+        ? `<span class="error-inline">${escapeHtml(call.error)}</span>`
+        : '';
+      return `
+        <div class="call-row">
+          <a class="call-main" href="call.html?id=${encodeURIComponent(call.id)}">
+            <div class="call-title">${title}</div>
+            <div class="call-meta">
+              <span>${sourceLabel(call.source)}</span>
+              <span class="meta-sep" aria-hidden="true"></span>
+              <span>${formatDate(call.created_at)}</span>
+            </div>
+            ${errorLine}
+          </a>
+          <div class="call-side">
+            <div class="call-side-top">
+              <span class="status-pill ${call.status}"><span class="dot"></span>${statusLabel(call.status)}</span>
+              <button class="delete-btn" type="button" data-call-id="${call.id}" title="Удалить запись" aria-label="Удалить запись">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 6h18"></path>
+                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                  <path d="M10 11v6"></path>
+                  <path d="M14 11v6"></path>
+                </svg>
+              </button>
+            </div>
+            <span class="call-duration">${formatDuration(call.duration_sec)}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function schedulePoll(calls) {
+    const active = calls.some((c) => c.status === 'recording' || c.status === 'processing');
+    if (active && !pollTimer) {
+      pollTimer = setInterval(refresh, 5000);
+    } else if (!active && pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  async function refresh() {
+    try {
+      const res = await fetch('/calls');
+      if (!res.ok) throw new Error('bad status');
+      const calls = await res.json();
+      renderCalls(calls);
+      schedulePoll(calls);
+    } catch (e) {
+      callsList.innerHTML = '<div class="placeholder">Не удалось загрузить список звонков. <button class="btn-ghost" onclick="location.reload()">Обновить страницу</button></div>';
+    }
+  }
+
+  refreshBtn.addEventListener('click', refresh);
+
+  callsList.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.delete-btn');
+    if (!btn) return;
+    e.preventDefault();
+
+    const callId = btn.dataset.callId;
+    if (!confirm('Удалить эту запись безвозвратно? Аудиофайл и расшифровка будут удалены.')) return;
+
+    btn.disabled = true;
+    try {
+      const res = await fetch(`/calls/${encodeURIComponent(callId)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('delete failed');
+      refresh();
+    } catch (err) {
+      btn.disabled = false;
+      alert('Не удалось удалить запись. Попробуйте снова.');
+    }
+  });
+
+  function setSelectedFile(file) {
+    selectedFile = file;
+    uploadFilename.textContent = file ? file.name : '';
+    uploadBtn.disabled = !file;
+    uploadStatus.textContent = '';
+    uploadStatus.className = 'upload-status';
+  }
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    setSelectedFile(fileInput.files[0] || null);
+  });
+
+  ['dragover', 'dragenter'].forEach((evt) => {
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+  });
+  ['dragleave', 'drop'].forEach((evt) => {
+    dropzone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+    });
+  });
+  dropzone.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) setSelectedFile(file);
+  });
+
+  uploadBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    uploadBtn.disabled = true;
+    uploadStatus.className = 'upload-status';
+    uploadStatus.textContent = 'Загружаем…';
+
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      const res = await fetch('/calls/upload', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('upload failed');
+      await res.json();
+      uploadStatus.className = 'upload-status ok';
+      uploadStatus.textContent = 'Загружено — обрабатывается.';
+      setSelectedFile(null);
+      fileInput.value = '';
+      refresh();
+    } catch (e) {
+      uploadStatus.className = 'upload-status error';
+      uploadStatus.textContent = 'Не удалось загрузить файл. Попробуйте снова.';
+      uploadBtn.disabled = false;
+    }
+  });
+
+  async function loadStoragePath() {
+    try {
+      const res = await fetch('/calls/storage-path');
+      if (!res.ok) throw new Error('bad status');
+      const data = await res.json();
+      storagePathEl.textContent = data.path;
+      storagePathEl.title = data.path;
+    } catch (e) {
+      storagePathEl.textContent = 'Не удалось определить путь';
+    }
+  }
+
+  openFolderBtn.addEventListener('click', async () => {
+    openFolderBtn.disabled = true;
+    try {
+      const res = await fetch('/calls/storage-path/open', { method: 'POST' });
+      if (!res.ok) throw new Error('open failed');
+    } catch (e) {
+      // сервер не смог открыть проводник — путь всё равно виден в storage-path
+    } finally {
+      openFolderBtn.disabled = false;
+    }
+  });
+
+  loadStoragePath();
+  refresh();
+})();
+</script>
+</body>
+</html>
