@@ -327,6 +327,7 @@
       <div class="nav-actions">
         <a class="btn-ghost" href="calls.html">Мои звонки</a>
         <button class="btn-ghost" id="refresh-btn" type="button">Обновить</button>
+        <button class="btn-ghost" id="signout-btn" type="button" hidden>Выйти</button>
       </div>
     </header>
 
@@ -356,13 +357,17 @@
     </section>
   </div>
 
-<script>
+<script type="module">
+import { isAuthEnabled, getSession, signOut } from './js/session.js';
+import { authedFetch } from './js/api.js';
+
 (() => {
   const urlInput = document.getElementById('url-input');
   const submitBtn = document.getElementById('submit-btn');
   const submitStatus = document.getElementById('submit-status');
   const videosList = document.getElementById('videos-list');
   const refreshBtn = document.getElementById('refresh-btn');
+  const signoutBtn = document.getElementById('signout-btn');
 
   const STATUS_LABELS = {
     processing: 'Обрабатывается',
@@ -445,7 +450,7 @@
 
   async function refresh() {
     try {
-      const res = await fetch('/videos');
+      const res = await authedFetch('/videos');
       if (!res.ok) throw new Error('bad status');
       const videos = await res.json();
       renderVideos(videos);
@@ -465,7 +470,7 @@
     submitStatus.textContent = 'Отправляем…';
 
     try {
-      const res = await fetch('/videos', {
+      const res = await authedFetch('/videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -487,7 +492,25 @@
     if (e.key === 'Enter') submitBtn.click();
   });
 
-  refresh();
+  signoutBtn.addEventListener('click', async () => {
+    await signOut();
+    location.href = 'login.html';
+  });
+
+  async function init() {
+    const authEnabled = await isAuthEnabled();
+    if (authEnabled) {
+      const session = await getSession();
+      if (!session) {
+        location.href = `login.html?redirect=${encodeURIComponent('videos.html' + location.search)}`;
+        return;
+      }
+      signoutBtn.hidden = false;
+    }
+    refresh();
+  }
+
+  init();
 })();
 </script>
 </body>

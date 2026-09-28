@@ -7,11 +7,16 @@
 спикеров на уже существующие сегменты по таймкодам — сам текст не пересчитывается.
 """
 
+from __future__ import annotations
+
 import sys
 import uuid
+from typing import TYPE_CHECKING
 
 from app import db
-from app.diarization import SpeakerTurn, diarize
+
+if TYPE_CHECKING:
+    from app.diarization import SpeakerTurn
 
 
 def _assign_speaker_ms(start_ms: int, end_ms: int, turns: list[SpeakerTurn]) -> str | None:
@@ -40,6 +45,8 @@ def reconcile_live_call(call_id: str, wav_path: str) -> None:
     критическая ошибка для MVP.
     """
     try:
+        from app.diarization import diarize
+
         speaker_turns = diarize(wav_path)
     except Exception as e:
         print(f"reconciliation failed for {call_id}: {e}", file=sys.stderr)

@@ -420,7 +420,8 @@
       <div class="nav-actions">
         <a class="btn-ghost" href="calls.html">Все звонки</a>
         <a class="btn-ghost" href="videos.html">Видео-инсайты</a>
-        <a class="btn-primary" href="live.html">Новый звонок</a>
+        <button class="btn-ghost" id="signout-btn" type="button" hidden>Выйти</button>
+        <a class="btn-primary" href="live.html" id="live-nav-link">Новый звонок</a>
       </div>
     </header>
 
@@ -443,9 +444,9 @@
     <section id="export-section" hidden>
       <h2>Экспорт</h2>
       <div class="export-actions">
-        <a class="btn-outline" id="export-txt" href="#">Скачать .txt</a>
-        <a class="btn-outline" id="export-pdf" href="#">Скачать .pdf</a>
-        <a class="btn-outline" id="export-audio" href="#">Скачать аудио</a>
+        <button class="btn-outline" id="export-txt" type="button">Скачать .txt</button>
+        <button class="btn-outline" id="export-pdf" type="button">Скачать .pdf</button>
+        <button class="btn-outline" id="export-audio" type="button">Скачать аудио</button>
       </div>
     </section>
 
@@ -459,7 +460,10 @@
     </section>
   </div>
 
-<script>
+<script type="module">
+import { isAuthEnabled, isLiveEnabled, getSession, signOut } from './js/session.js';
+import { authedFetch, downloadWithAuth } from './js/api.js';
+
 (() => {
   const callId = new URLSearchParams(location.search).get('id');
 
@@ -477,6 +481,7 @@
   const exportAudio = document.getElementById('export-audio');
   const transcriptSection = document.getElementById('transcript-section');
   const transcript = document.getElementById('transcript');
+  const signoutBtn = document.getElementById('signout-btn');
 
   const SOURCE_LABELS = {
     mic: 'Очная встреча',
@@ -492,6 +497,13 @@
   };
 
   let pollTimer = null;
+
+  // Раньше имя файла ставил сервер через Content-Disposition (обычная навигация
+  // `<a href>`); теперь скачивание идёт через Blob (см. api.js — нужен заголовок
+  // Authorization), так что заголовка нет и имя собираем на клиенте сами.
+  function safeFilename(name) {
+    return (name || callId).replace(/[^\w\-.]/g, '_');
+  }
   let editingSpeakerId = null;
   let lastCall = null;
 
@@ -616,7 +628,7 @@
 
   async function saveSpeakerName(speakerId, newName) {
     try {
-      const res = await fetch(`/calls/${encodeURIComponent(callId)}/speakers/${encodeURIComponent(speakerId)}`, {
+      const res = await authedFetch(`/calls/${encodeURIComponent(callId)}/speakers/${encodeURIComponent(speakerId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ display_name: newName }),
@@ -699,10 +711,6 @@
     statusPill.className = `status-pill ${call.status}`;
     statusText.textContent = statusLabel(call.status);
 
-    exportTxt.href = `/calls/${encodeURIComponent(callId)}/export?format=txt`;
-    exportPdf.href = `/calls/${encodeURIComponent(callId)}/export?format=pdf`;
-    exportAudio.href = `/calls/${encodeURIComponent(callId)}/audio`;
-
     if (call.status === 'failed') {
       errorBox.hidden = false;
       errorText.textContent = call.error || 'Причина ошибки не указана.';
@@ -722,7 +730,7 @@
 
   async function fetchAndRender() {
     try {
-      const res = await fetch(`/calls/${encodeURIComponent(callId)}`);
+      const res = await authedFetch(`/calls/${encodeURIComponent(callId)}`);
       if (res.status === 404) {
         titleEl.textContent = 'Звонок не найден';
         metaEl.textContent = '';
@@ -746,7 +754,44 @@
     }
   }
 
-  fetchAndRender();
+  exportTxt.addEventListener('click', () => {
+    const name = safeFilename(lastCall && lastCall.title);
+    downloadWithAuth(`/calls/${encodeURIComponent(callId)}/export?format=txt`, `${name}.txt`)
+      .catch(() => alert('Не удалось скачать файл. Попробуйте снова.'));
+  });
+  exportPdf.addEventListener('click', () => {
+    const name = safeFilename(lastCall && lastCall.title);
+    downloadWithAuth(`/calls/${encodeURIComponent(callId)}/export?format=pdf`, `${name}.pdf`)
+      .catch(() => alert('Не удалось скачать файл. Попробуйте снова.'));
+  });
+  exportAudio.addEventListener('click', () => {
+    const name = safeFilename(lastCall && lastCall.title);
+    downloadWithAuth(`/calls/${encodeURIComponent(callId)}/audio`, `${name}.wav`)
+      .catch(() => alert('Не удалось скачать файл. Попробуйте снова.'));
+  });
+
+  signoutBtn.addEventListener('click', async () => {
+    await signOut();
+    location.href = 'login.html';
+  });
+
+  async function init() {
+    if (!(await isLiveEnabled())) {
+      document.getElementById('live-nav-link')?.setAttribute('hidden', '');
+    }
+    const authEnabled = await isAuthEnabled();
+    if (authEnabled) {
+      const session = await getSession();
+      if (!session) {
+        location.href = `login.html?redirect=${encodeURIComponent('call.html' + location.search)}`;
+        return;
+      }
+      signoutBtn.hidden = false;
+    }
+    fetchAndRender();
+  }
+
+  init();
 })();
 </script>
 </body>

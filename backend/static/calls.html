@@ -251,6 +251,11 @@
     color: var(--ink-soft);
   }
 
+  /* [hidden] один и тот же (0,1,0) вес, что и .storage-info { display: flex } —
+     без этого правила `storageInfo.hidden = true` в JS ничего не скрывает
+     (найдено живым браузерным тестом auth-режима, не видно по статике). */
+  .storage-info[hidden] { display: none; }
+
   .storage-info svg { flex-shrink: 0; }
 
   .storage-path {
@@ -434,7 +439,8 @@
       <div class="nav-actions">
         <a class="btn-ghost" href="videos.html">Видео-инсайты</a>
         <button class="btn-ghost" id="refresh-btn" type="button">Обновить</button>
-        <a class="btn-primary" href="live.html">Начать новый звонок</a>
+        <button class="btn-ghost" id="signout-btn" type="button" hidden>Выйти</button>
+        <a class="btn-primary" href="live.html" id="live-nav-link">Начать новый звонок</a>
       </div>
     </header>
 
@@ -460,7 +466,7 @@
           <button class="btn-primary" id="upload-btn" type="button" disabled>Загрузить</button>
           <span class="upload-status" id="upload-status"></span>
         </div>
-        <div class="storage-info">
+        <div class="storage-info" id="storage-info">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path>
           </svg>
@@ -480,7 +486,10 @@
     </section>
   </div>
 
-<script>
+<script type="module">
+import { isAuthEnabled, isLiveEnabled, getSession, signOut } from './js/session.js';
+import { authedFetch } from './js/api.js';
+
 (() => {
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('file-input');
@@ -491,6 +500,8 @@
   const refreshBtn = document.getElementById('refresh-btn');
   const storagePathEl = document.getElementById('storage-path');
   const openFolderBtn = document.getElementById('open-folder-btn');
+  const storageInfo = document.getElementById('storage-info');
+  const signoutBtn = document.getElementById('signout-btn');
 
   const SOURCE_LABELS = {
     mic: 'Очная встреча',
@@ -598,7 +609,7 @@
 
   async function refresh() {
     try {
-      const res = await fetch('/calls');
+      const res = await authedFetch('/calls');
       if (!res.ok) throw new Error('bad status');
       const calls = await res.json();
       renderCalls(calls);
@@ -620,7 +631,7 @@
 
     btn.disabled = true;
     try {
-      const res = await fetch(`/calls/${encodeURIComponent(callId)}`, { method: 'DELETE' });
+      const res = await authedFetch(`/calls/${encodeURIComponent(callId)}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('delete failed');
       refresh();
     } catch (err) {
@@ -668,7 +679,7 @@
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
-      const res = await fetch('/calls/upload', { method: 'POST', body: formData });
+      const res = await authedFetch('/calls/upload', { method: 'POST', body: formData });
       if (!res.ok) throw new Error('upload failed');
       await res.json();
       uploadStatus.className = 'upload-status ok';
@@ -685,7 +696,7 @@
 
   async function loadStoragePath() {
     try {
-      const res = await fetch('/calls/storage-path');
+      const res = await authedFetch('/calls/storage-path');
       if (!res.ok) throw new Error('bad status');
       const data = await res.json();
       storagePathEl.textContent = data.path;
@@ -698,7 +709,7 @@
   openFolderBtn.addEventListener('click', async () => {
     openFolderBtn.disabled = true;
     try {
-      const res = await fetch('/calls/storage-path/open', { method: 'POST' });
+      const res = await authedFetch('/calls/storage-path/open', { method: 'POST' });
       if (!res.ok) throw new Error('open failed');
     } catch (e) {
       // сервер не смог открыть проводник — путь всё равно виден в storage-path
@@ -707,8 +718,31 @@
     }
   });
 
-  loadStoragePath();
-  refresh();
+  signoutBtn.addEventListener('click', async () => {
+    await signOut();
+    location.href = 'login.html';
+  });
+
+  async function init() {
+    if (!(await isLiveEnabled())) {
+      document.getElementById('live-nav-link')?.setAttribute('hidden', '');
+    }
+    const authEnabled = await isAuthEnabled();
+    if (authEnabled) {
+      const session = await getSession();
+      if (!session) {
+        location.href = `login.html?redirect=${encodeURIComponent('calls.html' + location.search)}`;
+        return;
+      }
+      signoutBtn.hidden = false;
+      storageInfo.hidden = true;
+    } else {
+      loadStoragePath();
+    }
+    refresh();
+  }
+
+  init();
 })();
 </script>
 </body>

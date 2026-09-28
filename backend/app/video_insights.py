@@ -1,19 +1,25 @@
 """Видео-инсайты (см. CLAUDE.md) — второй, независимый раздел приложения: пользователь
 даёт ссылку на YouTube-видео, сервис скачивает аудио, расшифровывает и делает отчёт по
-ключевым мыслям. В отличие от звонков — без диаризации (обычно один рассказчик) и без
-платных API суммаризации (локальная LLM через llama-cpp-python, CPU).
+ключевым мыслям. В отличие от звонков — без диаризации (обычно один рассказчик). Локально
+— без платных API суммаризации (локальная LLM через llama-cpp-python, CPU); в CLOUD_MODE
+(см. app/config.py) — через Gemini API, как и транскрибация (app/gemini_transcribe.py).
 """
+from __future__ import annotations
+
 import os
+import tempfile
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yt_dlp
-from llama_cpp import Llama
 
 from app import db
-from app.asr import transcribe
 from app.audio_convert import convert_to_wav
-from app.config import LLM_CTX_SIZE, LLM_MODEL_PATH, VIDEOS_DIR
+from app.config import CLOUD_MODE, LLM_CTX_SIZE, LLM_MODEL_PATH, VIDEOS_DIR
+
+if TYPE_CHECKING:
+    from llama_cpp import Llama
 
 _llm: Llama | None = None
 
@@ -50,6 +56,8 @@ _SUMMARY_USER_TEMPLATE = """Транскрипт видео (автоматич�
 def _get_llm() -> Llama:
     global _llm
     if _llm is None:
+        from llama_cpp import Llama
+
         if not LLM_MODEL_PATH.exists():
             raise FileNotFoundError(
                 f"Модель для суммаризации не найдена: {LLM_MODEL_PATH}. "
@@ -104,21 +112,38 @@ def summarize(transcript: str) -> str:
     return result["choices"][0]["message"]["content"].strip()
 
 
+def _summarize_cloud(transcript: str) -> str:
+    from app.gemini_transcribe import summarize_text
+
+    return summarize_text(_SUMMARY_SYSTEM_PROMPT, _SUMMARY_USER_TEMPLATE.format(transcript=transcript))
+
+
 def process_video(video_id: str, url: str) -> None:
-    video_dir = VIDEOS_DIR / video_id
+    # В облаке файловая система read-only, кроме /tmp — видео-аудио и так удаляется
+    # после обработки (см. finally), поэтому постоянное хранилище (Supabase Storage)
+    # здесь не нужно, в отличие от звонков (storage_backend.py).
+    video_dir = Path(tempfile.mkdtemp()) if CLOUD_MODE else VIDEOS_DIR / video_id
     video_dir.mkdir(parents=True, exist_ok=True)
 
     try:
         wav_path, title, duration = download_audio(url, video_dir)
 
-        # language=None — автоопределение, в отличие от звонков (всегда русский):
-        # видео может быть на любом языке.
-        asr_segments = transcribe(wav_path, language=None)
-        transcript = " ".join(seg.text for seg in asr_segments if seg.text).strip()
+        if CLOUD_MODE:
+            from app.gemini_transcribe import transcribe_plain
+
+            transcript = transcribe_plain(wav_path, language_hint=None).strip()
+        else:
+            # language=None — автоопределение, в отличие от звонков (всегда русский):
+            # видео может быть на любом языке.
+            from app.asr import transcribe
+
+            asr_segments = transcribe(wav_path, language=None)
+            transcript = " ".join(seg.text for seg in asr_segments if seg.text).strip()
+
         if not transcript:
             raise RuntimeError("Не удалось распознать речь в видео (тишина или музыка без слов?)")
 
-        summary = summarize(transcript)
+        summary = _summarize_cloud(transcript) if CLOUD_MODE else summarize(transcript)
 
         db.mark_video_done(video_id, title=title, duration_sec=duration, transcript=transcript, summary=summary)
     except Exception as e:
@@ -129,6 +154,10 @@ def process_video(video_id: str, url: str) -> None:
         # звонков, скачать оригинал видео-аудио пользователю не предлагаем.
         wav_file = video_dir / "audio.wav"
         wav_file.unlink(missing_ok=True)
+        if CLOUD_MODE:
+            import shutil
+
+            shutil.rmtree(video_dir, ignore_errors=True)
 
 
 def new_video_id() -> str:

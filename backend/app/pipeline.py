@@ -1,18 +1,35 @@
+from __future__ import annotations
+
 import uuid
 import wave
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from app import db
-from app.asr import AsrSegment, transcribe, transcribe_pcm
-from app.audio_convert import convert_to_wav
-from app.config import STORAGE_DIR
-from app.diarization import SpeakerTurn, diarize
-from app.live_diarization import LiveSpeakerClusterer
-from app.vad import SpeechChunker, SpeechSegment
+from app import db, storage_backend
+from app.config import CLOUD_MODE, STORAGE_DIR
+
+if TYPE_CHECKING:
+    # Только для type checker'а — в рантайме vad/live_diarization импортируются
+    # лениво внутри LiveCallSession (локальный режим), чтобы не требовать их в
+    # CLOUD_MODE (см. _process_call_cloud выше).
+    from app.live_diarization import LiveSpeakerClusterer
+    from app.vad import SpeechSegment
 
 
-def _assign_speaker(segment: AsrSegment, turns: list[SpeakerTurn]) -> str | None:
-    """Спикер с максимальным пересечением по времени с сегментом whisper."""
+def _wav_duration_sec(wav_path: str) -> float:
+    with wave.open(wav_path, "rb") as f:
+        return f.getnframes() / f.getframerate()
+
+
+def process_call(call_id: str, raw_audio_path: str) -> None:
+    if CLOUD_MODE:
+        _process_call_cloud(call_id, raw_audio_path)
+    else:
+        _process_call_local(call_id, raw_audio_path)
+
+
+def _assign_speaker(segment, turns: list) -> str | None:
+    """Спикер с максимальным пересечением по времени с сегментом whisper (локальный режим)."""
     best_speaker = None
     best_overlap = 0.0
     for turn in turns:
@@ -23,12 +40,14 @@ def _assign_speaker(segment: AsrSegment, turns: list[SpeakerTurn]) -> str | None
     return best_speaker
 
 
-def _wav_duration_sec(wav_path: str) -> float:
-    with wave.open(wav_path, "rb") as f:
-        return f.getnframes() / f.getframerate()
+def _process_call_local(call_id: str, raw_audio_path: str) -> None:
+    # Ленивые импорты: локальный пайплайн не должен требовать faster-whisper/torch/
+    # pyannote в облачном режиме (см. _process_call_cloud) — при CLOUD_MODE=true эта
+    # функция вообще не вызывается, поэтому импорты сюда безопасны.
+    from app.asr import transcribe
+    from app.audio_convert import convert_to_wav
+    from app.diarization import diarize
 
-
-def process_call(call_id: str, raw_audio_path: str) -> None:
     call_dir = STORAGE_DIR / call_id
     wav_path = call_dir / "audio.wav"
 
@@ -64,6 +83,48 @@ def process_call(call_id: str, raw_audio_path: str) -> None:
         Path(raw_audio_path).unlink(missing_ok=True)
 
 
+def _process_call_cloud(call_id: str, raw_audio_path: str) -> None:
+    import tempfile
+
+    from app.audio_convert import convert_to_wav
+    from app.gemini_transcribe import transcribe_with_speakers
+
+    wav_tmp_path: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            wav_tmp_path = tmp.name
+        convert_to_wav(raw_audio_path, wav_tmp_path)
+        duration_sec = _wav_duration_sec(wav_tmp_path)
+
+        segments = transcribe_with_speakers(wav_tmp_path)
+
+        raw_labels = sorted({s.speaker_label for s in segments})
+        label_to_id = {label: str(uuid.uuid4()) for label in raw_labels}
+        for i, label in enumerate(raw_labels, start=1):
+            db.upsert_speaker(label_to_id[label], call_id, f"Спикер {i}")
+
+        for seg in segments:
+            db.insert_segment(
+                call_id=call_id,
+                speaker_id=label_to_id.get(seg.speaker_label),
+                start_ms=seg.start_ms,
+                end_ms=seg.end_ms,
+                text=seg.text,
+                is_final=True,
+            )
+
+        storage_ref = storage_backend.save_audio(call_id, wav_tmp_path)
+        db.save_audio_file(call_id, storage_ref, fmt="wav", size_bytes=Path(wav_tmp_path).stat().st_size)
+
+        db.mark_call_done(call_id, duration_sec)
+    except Exception as e:
+        db.mark_call_failed(call_id, str(e))
+    finally:
+        Path(raw_audio_path).unlink(missing_ok=True)
+        if wav_tmp_path is not None:
+            Path(wav_tmp_path).unlink(missing_ok=True)
+
+
 class LiveCallSession:
     """Состояние одного live-звонка (Stage 2): VAD-чанкинг + грубая онлайн-диаризация.
 
@@ -73,6 +134,13 @@ class LiveCallSession:
     """
 
     def __init__(self, call_id: str):
+        # Ленивые импорты: LiveCallSession создаётся только из /ws/stream/{call_id}
+        # в main.py, который сам отказывает в CLOUD_MODE ещё до конструктора — но
+        # импорты всё равно держим здесь, а не на верхнем уровне модуля, чтобы сам
+        # факт `import app.pipeline` не требовал silero-vad/resemblyzer в облаке.
+        from app.live_diarization import LiveSpeakerClusterer
+        from app.vad import SpeechChunker
+
         self.call_id = call_id
         self._chunker = SpeechChunker()
         self._clusterer = LiveSpeakerClusterer()

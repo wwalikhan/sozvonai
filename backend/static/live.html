@@ -353,6 +353,7 @@
       <div class="nav-actions">
         <a class="btn-ghost" href="calls.html">Мои звонки</a>
         <a class="btn-ghost" href="videos.html">Видео-инсайты</a>
+        <button class="btn-ghost" id="signout-btn" type="button" hidden>Выйти</button>
         <div class="status" id="status">
           <span class="status-indicator" aria-hidden="true">
             <span class="dot"></span>
@@ -387,7 +388,10 @@
     <div class="hint" id="call-link-wrap" hidden><a class="btn-ghost" id="call-link" href="#">Открыть эту запись со скачиванием →</a></div>
   </div>
 
-<script>
+<script type="module">
+import { isAuthEnabled, isLiveEnabled, getSession, signOut } from './js/session.js';
+import { wsAuthParam } from './js/api.js';
+
 (() => {
   const toggleBtn = document.getElementById('toggle');
   const statusEl = document.getElementById('status');
@@ -399,6 +403,7 @@
   const callLink = document.getElementById('call-link');
   const modeSelect = document.getElementById('mode-select');
   const modeInputs = Array.from(document.querySelectorAll('input[name="call-mode"]'));
+  const signoutBtn = document.getElementById('signout-btn');
 
   class StartError extends Error {}
 
@@ -603,7 +608,8 @@
       currentCallId = crypto.randomUUID();
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const wsSource = mode === 'online' ? 'tab_capture' : 'mic';
-      ws = new WebSocket(`${proto}://${location.host}/ws/stream/${currentCallId}?source=${wsSource}`);
+      const authParam = await wsAuthParam();
+      ws = new WebSocket(`${proto}://${location.host}/ws/stream/${currentCallId}?source=${wsSource}${authParam}`);
       ws.binaryType = 'arraybuffer';
 
       await new Promise((resolve, reject) => {
@@ -669,7 +675,31 @@
     if (toggleBtn.classList.contains('recording')) stop(); else start();
   });
 
-  updateHintForMode();
+  signoutBtn.addEventListener('click', async () => {
+    await signOut();
+    location.href = 'login.html';
+  });
+
+  async function init() {
+    const authEnabled = await isAuthEnabled();
+    if (authEnabled) {
+      const session = await getSession();
+      if (!session) {
+        location.href = `login.html?redirect=${encodeURIComponent('live.html' + location.search)}`;
+        return;
+      }
+      signoutBtn.hidden = false;
+    }
+    if (!(await isLiveEnabled())) {
+      toggleBtn.disabled = true;
+      modeSelect.hidden = true;
+      hint.textContent = 'Live-звонки недоступны в этом деплое — загрузите готовую запись на странице «Мои звонки».';
+      return;
+    }
+    updateHintForMode();
+  }
+
+  init();
 })();
 </script>
 </body>

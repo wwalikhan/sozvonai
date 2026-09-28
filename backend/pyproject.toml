@@ -3,29 +3,46 @@ name = "sozvonai-backend"
 version = "0.1.0"
 description = "SozvonAI backend — локальная транскрибация и диаризация деловых звонков"
 requires-python = ">=3.11,<3.12"
+# Базовые зависимости — ставятся везде, включая облачный деплой на Vercel
+# (CLOUD_MODE=true, см. app/config.py). Тяжёлые ML-пакеты для локального
+# GPU-пайплайна — в extra "local" ниже, чтобы они физически не попадали в
+# облачный деплой (тот их не импортирует, см. lazy-импорты в app/pipeline.py,
+# app/reconciliation.py, app/video_insights.py).
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "python-multipart>=0.0.9",
+    "python-dotenv>=1.0",
+    "fpdf2>=2.7",
+    "yt-dlp>=2026.8",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.1",
+    "pyjwt[crypto]>=2.9",
+    "google-genai>=1.0",
+    "supabase>=2.0",
+    "imageio-ffmpeg>=0.5",
+]
+
+[project.optional-dependencies]
+local = [
     "faster-whisper>=1.2",
     "nvidia-cublas-cu12",
     "nvidia-cudnn-cu12",
     "pyannote.audio>=3.3",
-    "python-dotenv>=1.0",
     "silero-vad>=6.2",
     "webrtcvad-wheels>=2.0.10",
     "resemblyzer>=0.1.4",
     "librosa>=0.10",
-    "fpdf2>=2.7",
-    "yt-dlp>=2026.8",
     "llama-cpp-python>=0.3.35",
 ]
+
+# Локальная установка (GPU-пайплайн, live-звонки): pip install -e ".[local]"
 
 # resemblyzer официально зависит от "webrtcvad" (требует компилятор C++ на Windows) —
 # ставим "webrtcvad-wheels" (готовые wheels, тот же модуль `webrtcvad`) ДО resemblyzer,
 # затем `pip install resemblyzer --no-deps`, чтобы pip не пытался собрать webrtcvad сам.
 
-# torch с GPU(CUDA)-поддержкой НЕ ставится через обычный `pip install -e .` —
+# torch с GPU(CUDA)-поддержкой НЕ ставится через обычный `pip install -e ".[local]"` —
 # PyPI по умолчанию даёт CPU-сборку. Ставить отдельно под версию видеокарты/драйвера:
 #   pip install torch==<версия из "pip show torch"> --index-url https://download.pytorch.org/whl/cu130 --upgrade
 # (на этой машине сработал тег cu130 — см. docs/architecture.md §8)

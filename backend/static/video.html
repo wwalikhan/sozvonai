@@ -177,6 +177,7 @@
       <div class="wordmark">SozvonAI</div>
       <div class="nav-actions">
         <a class="btn-ghost" href="videos.html">Все видео</a>
+        <button class="btn-ghost" id="signout-btn" type="button" hidden>Выйти</button>
         <a class="btn-primary" href="videos.html">Новое видео</a>
       </div>
     </header>
@@ -218,10 +219,14 @@
     </section>
   </div>
 
-<script>
+<script type="module">
+import { isAuthEnabled, getSession, signOut } from './js/session.js';
+import { authedFetch } from './js/api.js';
+
 (() => {
   const videoId = new URLSearchParams(location.search).get('id');
 
+  const signoutBtn = document.getElementById('signout-btn');
   const titleEl = document.getElementById('video-title');
   const metaEl = document.getElementById('video-meta');
   const statusPill = document.getElementById('video-status');
@@ -352,7 +357,7 @@
 
   async function fetchAndRender() {
     try {
-      const res = await fetch(`/videos/${encodeURIComponent(videoId)}`);
+      const res = await authedFetch(`/videos/${encodeURIComponent(videoId)}`);
       if (res.status === 404) {
         titleEl.textContent = 'Видео не найдено';
         metaEl.textContent = '';
@@ -376,7 +381,25 @@
     }
   }
 
-  fetchAndRender();
+  signoutBtn.addEventListener('click', async () => {
+    await signOut();
+    location.href = 'login.html';
+  });
+
+  async function init() {
+    const authEnabled = await isAuthEnabled();
+    if (authEnabled) {
+      const session = await getSession();
+      if (!session) {
+        location.href = `login.html?redirect=${encodeURIComponent('video.html' + location.search)}`;
+        return;
+      }
+      signoutBtn.hidden = false;
+    }
+    fetchAndRender();
+  }
+
+  init();
 })();
 </script>
 </body>

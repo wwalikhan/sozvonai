@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SozvonAI — вход</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F6FA;
+    --surface: #FFFFFF;
+    --surface-sunken: #ECEEF5;
+    --ink: #171933;
+    --ink-soft: #6E7191;
+    --rule: #DFE1EC;
+    --primary: #3B3FE0;
+    --primary-soft: #EDEDFC;
+    --ok: #1F8A70;
+    --ok-bg: #E6F3EF;
+    --danger: #E0483B;
+    --danger-bg: #FBE3E1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12132A;
+      --surface: #1B1D3D;
+      --surface-sunken: #14152F;
+      --ink: #E9EAF7;
+      --ink-soft: #9A9CC4;
+      --rule: #33355C;
+      --primary: #8285FF;
+      --primary-soft: #292B58;
+      --ok: #52C4A4;
+      --ok-bg: #17332C;
+      --danger: #F0685C;
+      --danger-bg: #3B211E;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  a:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  a { color: inherit; }
+
+  .page {
+    width: 100%;
+    max-width: 400px;
+    padding: 20px;
+  }
+
+  .wordmark {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 26px;
+    letter-spacing: -0.01em;
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  .surface-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 18px;
+    padding: 30px 28px;
+    box-shadow: 0 1px 2px rgba(23, 25, 51, 0.05), 0 16px 32px -20px rgba(59, 63, 224, 0.35);
+  }
+
+  .card-title {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 22px;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+
+  .card-sub {
+    margin: 0 0 22px;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+
+  .field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+  }
+
+  .field input {
+    width: 100%;
+    font-family: inherit;
+    font-size: 15px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--rule);
+    background: var(--surface-sunken);
+    color: var(--ink);
+  }
+
+  .field input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+  .btn-primary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    cursor: pointer;
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 8px 20px -10px rgba(59, 63, 224, 0.55);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    margin-top: 6px;
+  }
+
+  .btn-primary:hover { transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; transform: none; box-shadow: none; }
+
+  .btn-ghost {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    text-decoration: none;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+    padding: 4px;
+    transition: color 0.15s ease;
+  }
+
+  .btn-ghost:hover { color: var(--primary); }
+
+  .form-status {
+    margin-top: 14px;
+    font-size: 14px;
+    color: var(--ink-soft);
+    min-height: 20px;
+  }
+
+  .form-status.error { color: var(--danger); }
+  .form-status.ok { color: var(--ok); }
+
+  .switch-row {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rule);
+    text-align: center;
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+
+  .loading-note {
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="wordmark">SozvonAI</div>
+
+    <div class="surface-card" id="auth-card" hidden>
+      <h1 class="card-title" id="card-title">Вход</h1>
+      <p class="card-sub" id="card-sub">Войдите, чтобы увидеть свои звонки и видео-инсайты.</p>
+
+      <form id="auth-form">
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="password">Пароль</label>
+          <input type="password" id="password" name="password" autocomplete="current-password" required minlength="6">
+        </div>
+        <button class="btn-primary" id="submit-btn" type="submit">Войти</button>
+      </form>
+
+      <div class="form-status" id="form-status"></div>
+
+      <div class="switch-row">
+        <span id="switch-text">Нет аккаунта?</span>
+        <button class="btn-ghost" id="switch-btn" type="button">Зарегистрироваться</button>
+      </div>
+    </div>
+
+    <div class="loading-note" id="loading-note">Загрузка…</div>
+  </div>
+
+<script type="module">
+  import { isAuthEnabled, getSession, signInWithPassword, signUp } from './js/session.js';
+
+  // ?redirect= всегда должен указывать на одну из соседних статических страниц
+  // (см. calls.html и др. — конструируют его сами как 'calls.html' + location.search).
+  // Не доверяем ему как есть: произвольная ссылка вида login.html?redirect=https://evil
+  // была бы open-redirect'ом сразу после успешного логина.
+  function sanitizeRedirect(raw) {
+    if (!raw) return 'calls.html';
+    if (/^[a-z0-9_-]+\.html(\?.*)?$/i.test(raw)) return raw;
+    return 'calls.html';
+  }
+
+  const params = new URLSearchParams(location.search);
+  const redirectTarget = sanitizeRedirect(params.get('redirect'));
+
+  const authCard = document.getElementById('auth-card');
+  const loadingNote = document.getElementById('loading-note');
+  const cardTitle = document.getElementById('card-title');
+  const cardSub = document.getElementById('card-sub');
+  const authForm = document.getElementById('auth-form');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const submitBtn = document.getElementById('submit-btn');
+  const formStatus = document.getElementById('form-status');
+  const switchText = document.getElementById('switch-text');
+  const switchBtn = document.getElementById('switch-btn');
+
+  let mode = 'signin';
+
+  function applyMode() {
+    if (mode === 'signin') {
+      cardTitle.textContent = 'Вход';
+      cardSub.textContent = 'Войдите, чтобы увидеть свои звонки и видео-инсайты.';
+      submitBtn.textContent = 'Войти';
+      switchText.textContent = 'Нет аккаунта?';
+      switchBtn.textContent = 'Зарегистрироваться';
+      passwordInput.autocomplete = 'current-password';
+    } else {
+      cardTitle.textContent = 'Регистрация';
+      cardSub.textContent = 'Создайте аккаунт, чтобы начать работать со SozvonAI.';
+      submitBtn.textContent = 'Зарегистрироваться';
+      switchText.textContent = 'Уже есть аккаунт?';
+      switchBtn.textContent = 'Войти';
+      passwordInput.autocomplete = 'new-password';
+    }
+    formStatus.className = 'form-status';
+    formStatus.textContent = '';
+  }
+
+  switchBtn.addEventListener('click', () => {
+    mode = mode === 'signin' ? 'signup' : 'signin';
+    applyMode();
+  });
+
+  authForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    if (!email || !password) return;
+
+    submitBtn.disabled = true;
+    formStatus.className = 'form-status';
+    formStatus.textContent = mode === 'signin' ? 'Входим…' : 'Регистрируем…';
+
+    try {
+      const { error } = mode === 'signin'
+        ? await signInWithPassword(email, password)
+        : await signUp(email, password);
+
+      if (error) {
+        formStatus.className = 'form-status error';
+        formStatus.textContent = error.message || 'Не удалось выполнить операцию. Попробуйте снова.';
+        submitBtn.disabled = false;
+        return;
+      }
+
+      if (mode === 'signup') {
+        // Supabase может требовать подтверждение почты — сессии может не быть.
+        const session = await getSession();
+        if (!session) {
+          formStatus.className = 'form-status ok';
+          formStatus.textContent = 'Проверьте почту — нужно подтвердить регистрацию перед входом.';
+          submitBtn.disabled = false;
+          return;
+        }
+      }
+
+      location.href = redirectTarget;
+    } catch (err) {
+      formStatus.className = 'form-status error';
+      formStatus.textContent = 'Не удалось выполнить операцию. Попробуйте снова.';
+      submitBtn.disabled = false;
+    }
+  });
+
+  (async () => {
+    const authEnabled = await isAuthEnabled();
+    if (!authEnabled) {
+      location.href = redirectTarget;
+      return;
+    }
+
+    const session = await getSession();
+    if (session) {
+      location.href = redirectTarget;
+      return;
+    }
+
+    loadingNote.hidden = true;
+    authCard.hidden = false;
+    applyMode();
+  })();
+</script>
+</body>
+</html>
