@@ -172,6 +172,8 @@ class LiveCallSession:
     MIN_SEGMENT_MS = 300
 
     def _process_segment(self, seg: SpeechSegment) -> dict | None:
+        from app.asr import transcribe_pcm
+
         self.total_ms = max(self.total_ms, seg.end_ms)
         if seg.end_ms - seg.start_ms < self.MIN_SEGMENT_MS:
             return None

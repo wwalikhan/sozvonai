@@ -12,6 +12,7 @@ alignment — на длинных записях возможен дрейф. Н
 """
 
 import json
+import time
 from dataclasses import dataclass
 
 from pydantic import BaseModel
@@ -19,6 +20,13 @@ from pydantic import BaseModel
 from app.config import GEMINI_API_KEY, GEMINI_MODEL
 
 _client = None
+
+# Модели Gemini flash-линейки (включая GEMINI_MODEL по умолчанию) периодически
+# отдают 503 "high demand" на самом Google — это не баг конфигурации, а типичная
+# перегрузка препью-моделей. Наблюдалось эмпирически: ~1 из 3 запросов с реальным
+# аудио. Несколько попыток с паузой решают это на практике.
+_RETRY_ATTEMPTS = 3
+_RETRY_DELAY_SEC = 5
 
 
 def _get_client():
@@ -30,6 +38,20 @@ def _get_client():
             raise RuntimeError("CLOUD_MODE требует GEMINI_API_KEY")
         _client = genai.Client(api_key=GEMINI_API_KEY)
     return _client
+
+
+def _generate_with_retry(client, **kwargs):
+    from google.genai.errors import ServerError
+
+    last_exc = None
+    for attempt in range(_RETRY_ATTEMPTS):
+        try:
+            return client.models.generate_content(**kwargs)
+        except ServerError as exc:
+            last_exc = exc
+            if attempt < _RETRY_ATTEMPTS - 1:
+                time.sleep(_RETRY_DELAY_SEC)
+    raise last_exc
 
 
 @dataclass
@@ -74,7 +96,8 @@ def transcribe_with_speakers(audio_path: str, language_hint: str | None = "ru") 
     language_instruction = "русский" if language_hint == "ru" else "определи автоматически"
     prompt = _SPEAKER_PROMPT.format(language_instruction=language_instruction)
 
-    response = client.models.generate_content(
+    response = _generate_with_retry(
+        client,
         model=GEMINI_MODEL,
         contents=[uploaded, prompt],
         config=types.GenerateContentConfig(
@@ -110,7 +133,7 @@ def transcribe_plain(audio_path: str, language_hint: str | None = None) -> str:
     language_instruction = "русский" if language_hint == "ru" else "определи автоматически"
     prompt = _PLAIN_PROMPT.format(language_instruction=language_instruction)
 
-    response = client.models.generate_content(model=GEMINI_MODEL, contents=[uploaded, prompt])
+    response = _generate_with_retry(client, model=GEMINI_MODEL, contents=[uploaded, prompt])
     return (response.text or "").strip()
 
 
@@ -119,7 +142,8 @@ def summarize_text(system_prompt: str, user_prompt: str) -> str:
     client = _get_client()
     from google.genai import types
 
-    response = client.models.generate_content(
+    response = _generate_with_retry(
+        client,
         model=GEMINI_MODEL,
         contents=[user_prompt],
         config=types.GenerateContentConfig(system_instruction=system_prompt),

@@ -33,7 +33,7 @@ AUTH_ENABLED = bool(DATABASE_URL)
 # live-звонки (WebSocket) недоступны — см. CLAUDE.md.
 CLOUD_MODE = os.environ.get("CLOUD_MODE", "").lower() in ("1", "true", "yes")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
 SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "call-audio")
 # Service-role ключ — только для сервера (никогда не отдаётся фронтенду, в отличие
 # от SUPABASE_ANON_KEY). Нужен, чтобы бэкенд писал/читал Storage от имени любого
