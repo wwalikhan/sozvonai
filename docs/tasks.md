@@ -74,6 +74,108 @@ Batch и live пайплайны прогнаны на настоящей рус
 6. ✅ UI — `static/videos.html` (список + форма отправки ссылки) и `static/video.html` (отчёт + полный транскрипт + экспорт .txt на клиенте). Ссылка "Видео-инсайты" добавлена в шапку `live.html`/`calls.html`/`call.html`.
 7. ✅ Проверено end-to-end через реальный HTTP-запрос (`POST /videos` → фоновая обработка → `GET /videos/{id}`) на реальном YouTube-видео — скачивание, автоопределение языка, суммаризация в отчёт — всё отработало корректно.
 
+## Деплой на Vercel (облачный режим, Gemini) — 🟡 в процессе, продолжить в новой сессии
+
+Контекст и полный план: `C:\Users\Uali_\.claude\plans\eventual-watching-quill.md`.
+Код для `CLOUD_MODE` уже написан, закоммичен и запушен (main, коммит `f2517e4`
+"Pin working Gemini model and retry 503s..." поверх `5e0f70c`). **Не переписывать
+код заново** — доделать только сам деплой.
+
+### Уже сделано
+- Рабочая модель Gemini подобрана эмпирически: **`gemini-3.6-flash`** (дефолт в
+  `app/config.py`). `gemini-2.5-flash`/`-lite` — 404 (недоступны новым ключам),
+  `gemini-3.7/3.8-flash`, `gemini-flash-latest` — стабильно 503 (перегрузка на
+  стороне Google). `gemini-3.6-flash` подтверждён end-to-end на реальной записи
+  голоса (аудио + JSON-диаризация) — работает ~2 из 3 попыток, поэтому в
+  `app/gemini_transcribe.py` добавлен retry (3 попытки, пауза 5с) на `ServerError`.
+- `backend/.env` дополнен (не в git): `GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `SUPABASE_STORAGE_BUCKET=call-audio` — секреты уже на месте, спрашивать
+  пользователя заново не нужно.
+- На Vercel-проекте `sozvonai` (`prj_36QmOIRilaNsKenJxR6S6QEml20q`) выставлены
+  все 8 env-переменных: `CLOUD_MODE=true`, `DATABASE_URL`, `SUPABASE_URL`,
+  `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GEMINI_API_KEY`,
+  `GEMINI_MODEL=gemini-3.6-flash`, `SUPABASE_STORAGE_BUCKET=call-audio`.
+- Supabase Storage bucket `call-audio` существует и уже проверен end-to-end
+  (upload/download/signed URL/delete) в прошлой сессии.
+- `create_git_project` (авто-деплой из GitHub) не сработал ещё в прошлой сессии
+  (403 "re-authenticate to scope walikhan") — решили деплоить напрямую через
+  `mcp__vercel__create_deployment` с inline-файлами в тот же проект.
+
+### Важный технический вывод (не наступать на те же грабли)
+`mcp__vercel__create_deployment` с инлайновыми `{file, data, encoding: "utf-8"}`
+**не** кладёт содержимое в sha-кэш Vercel — на него нельзя сослаться позже через
+`{file, sha, size}` в другом деплое (проверено многократно, "missing_files").
+Единственный способ подготовить файл для финального деплоя по sha-ссылке —
+сначала явно залить его через `mcp__vercel__upload_file` (`requestBody` — base64,
+`xVercelDigest` — sha1, `contentLength` — размер в байтах), и только потом
+ссылаться на него по `{file, sha, size}` в `create_deployment`.
+**Base64 обязательно генерировать через Bash (`base64 -w0 <файл>`) прямо перед
+вызовом**, не копировать вручную из вывода `Read` — ручная перекопировка больших
+base64-блобов один раз уже дала `sha1sum_mismatch`/`Binary arguments must be
+valid base64 strings`.
+
+### Прогресс загрузки файлов (17 из 27 подтверждены в sha-хранилище Vercel)
+Уже готовы к финальному деплою по `{file, sha, size}` (не перезаливать):
+```
+app/__init__.py            da39a3ee5e6b4b0d3255bfef95601890afd80709   0
+app/asr.py                  90e37a796f02879e4def7cf9be9a7d02098ed0a2  4525
+app/audio_convert.py        25a3bad4f7b54b341a0060d4039359e561eb9728  907
+app/auth.py                 9163d1345be19314359d7953a371fc0ead12973f  2514
+app/diarization.py          d3c109a3d58fe5049f469bb90728ec20406a129c  1204
+app/gpu.py                  007cdbf2c0053d638a977c02aea630f692f4e696  1335
+app/config.py               59bf4eb2fc21b06c4cd84cc7b5f1e73ba8dd2cca  6383
+app/storage_backend.py      3503d4d3cd830c682c70de9526192a9e9e64ec00  2878
+app/reconciliation.py       3951b8725b4260f4c2d5fd3866b68a55cabbaba8  3304
+app/live_diarization.py     02255a241e7ee3ab74beffcc0e7566393bb59b40  4855
+app/db.py                   23ad5454d473c39c9f0f9892bff12b50f8d1868e  12953
+app/vad.py                  d9a0c5ed0d398ac0b4c88c2798d937a41b5ad9cb  6526
+pyproject.toml               42fd0a11b5e47a5fcbd1dcfde8ecd30fed94f437 2783
+vercel.json                  6691d765c275a2282a7b479adf90e9aecd125f5b 213
+static/favicon.svg           f1dd5859ad79f2aaa56079a6f8f2ec51606f6298 380
+static/js/api.js             0c8f18f77069773ab1412229818ec571df7151fb 1953
+static/js/session.js         79afc3a0ce97f3e65b2fde41b3bdb5c774ece7ce 3757
+```
+(sha1/size всегда можно пересчитать заново: `sha1sum <файл>` + `stat -c%s <файл>`
+из `backend/` — если вдруг не совпадёт, значит файл поменялся, перезалить.)
+
+Ещё нужно залить через `upload_file` (базовая сессия прервалась ровно на первом
+из них — `gemini_transcribe.py` мог не долиться, статус неизвестен, перепроверить):
+```
+app/gemini_transcribe.py    7691b359c5760a9f699fb01080d33d5f607d19e4  6054
+app/pipeline.py              a742461f254e5d93b1fdb1ec4a1ac025fdbd6955 9780
+app/main.py                  b3639aa7f3a02b0cd9b4c1a8a1b088c71856316c 17570
+app/video_insights.py        be68e0664a9e62f93205367bad439803d1b94dfd 8133
+static/login.html            46c1b0ca7c64c8488c8646d2039b633a65308c4b 10183
+static/videos.html           74c843e6a0b912897a3bec190846c00980d86379 14172
+static/video.html            2e9338686458b4b5beda00eafe79fec682c01445 14382
+static/calls.html            6080d5d3c660c3466453bbfefbd0eca5dc513891 22037
+static/call.html             2606069d34d87b06c862f6cac491c5d727f0e40f 24100
+static/live.html             3cdee38f5f1437a1229054c38f9d6340153ec96f 24229
+```
+
+### Следующие шаги
+1. Для каждого файла из списка "ещё нужно залить": `base64 -w0 <путь>` в Bash,
+   результат целиком передать в `mcp__vercel__upload_file` (`xVercelDigest` = sha1
+   из таблицы выше, `contentLength` = размер из таблицы). При таймауте — просто
+   повторить тот же вызов ещё раз (наблюдалось, что временами таймаутит без
+   видимой причины, повтор обычно проходит).
+2. Когда все 27 файлов подтверждены (`upload_file` вернул `{"result":{"urls":[...]}}`),
+   один финальный `mcp__vercel__create_deployment` с `target: "production"`,
+   `project: "prj_36QmOIRilaNsKenJxR6S6QEml20q"`, `projectSettings.framework:
+   "fastapi"` и всеми 27 файлами как `{file, sha, size}` (без `data`).
+3. Проверить: `GET /health`, `GET /config` (`live_enabled: false`, `auth_enabled:
+   true`) на реальном URL задеплоенного проекта.
+4. Залогиниться через `login.html` на реальном Supabase-проекте в браузере —
+   этот сквозной браузерный тест ещё ни разу не прогонялся (см. ниже).
+5. Загрузить короткую тестовую запись через задеплоенный `calls.html`, убедиться
+   что сегменты с спикерами появляются и `GET /calls/{id}` сразу `status: done`.
+6. Через Supabase MCP (`execute_sql`/`list_storage_buckets`) проверить, что
+   строки реально попали в `calls`/`audio_files`/`speakers`/`transcript_segments`
+   и файл лёг в bucket `call-audio`.
+7. Только после успешной проверки — обновить `CLAUDE.md`/`docs/status.md` записью
+   "Деплой ✅ готово" (сейчас там `❌ не начато` — уже неактуально, но рано ставить
+   ✅ до реальной проверки).
+
 ### Установка окружения (Stage 5)
 - `pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu` — обычный PyPI sdist требует компилятор (CMake+MSVC), этот индекс отдаёт готовый CPU-wheel под Windows/Python 3.11.
 - `pip install yt-dlp` — обычная зависимость, без сюрпризов.
