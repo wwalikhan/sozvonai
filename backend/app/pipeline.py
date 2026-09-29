@@ -103,17 +103,27 @@ def process_call_from_storage(call_id: str, storage_raw_ref: str) -> None:
 def _process_call_cloud(call_id: str, raw_audio_path: str) -> None:
     import tempfile
 
-    from app.audio_convert import convert_to_wav
+    from app.audio_convert import convert_to_compressed_mono, convert_to_wav
     from app.groq_transcribe import transcribe_with_speakers
 
     wav_tmp_path: str | None = None
+    compressed_tmp_path: str | None = None
     try:
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             wav_tmp_path = tmp.name
         convert_to_wav(raw_audio_path, wav_tmp_path)
         duration_sec = _wav_duration_sec(wav_tmp_path)
 
-        segments = transcribe_with_speakers(wav_tmp_path)
+        # Groq режет тело запроса на бесплатном тире ~25МБ — несжатый WAV из
+        # convert_to_wav() выше на длинных записях легко превышает лимит, поэтому
+        # для самой отправки в Groq используем отдельный сжатый mp3 (см.
+        # audio_convert.convert_to_compressed_mono), а WAV остаётся только для
+        # хранения в Supabase Storage (проигрывание в браузере).
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+            compressed_tmp_path = tmp.name
+        convert_to_compressed_mono(raw_audio_path, compressed_tmp_path)
+
+        segments = transcribe_with_speakers(compressed_tmp_path)
 
         raw_labels = sorted({s.speaker_label for s in segments})
         label_to_id = {label: str(uuid.uuid4()) for label in raw_labels}
@@ -140,6 +150,8 @@ def _process_call_cloud(call_id: str, raw_audio_path: str) -> None:
         Path(raw_audio_path).unlink(missing_ok=True)
         if wav_tmp_path is not None:
             Path(wav_tmp_path).unlink(missing_ok=True)
+        if compressed_tmp_path is not None:
+            Path(compressed_tmp_path).unlink(missing_ok=True)
 
 
 class LiveCallSession:

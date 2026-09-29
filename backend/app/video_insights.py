@@ -129,9 +129,12 @@ def process_video(video_id: str, url: str) -> None:
         wav_path, title, duration = download_audio(url, video_dir)
 
         if CLOUD_MODE:
+            from app.audio_convert import convert_to_compressed_mono
             from app.groq_transcribe import transcribe_plain
 
-            transcript = transcribe_plain(wav_path, language_hint=None).strip()
+            compressed_path = str(Path(wav_path).with_suffix(".mp3"))
+            convert_to_compressed_mono(wav_path, compressed_path)
+            transcript = transcribe_plain(compressed_path, language_hint=None).strip()
         else:
             # language=None — автоопределение, в отличие от звонков (всегда русский):
             # видео может быть на любом языке.
