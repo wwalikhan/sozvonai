@@ -52,6 +52,15 @@ def open_audio_for_read(storage_ref: str) -> BinaryIO:
     return open(storage_ref, "rb")
 
 
+def create_signed_upload_url(object_prefix: str, dest_name: str) -> dict:
+    """Только для CLOUD_MODE — подписанная ссылка для прямой загрузки с браузера в
+    Storage, в обход тела запроса к Vercel-функции (жёсткий лимит ~4.5МБ, см.
+    docs/tasks.md, раздел "Прямая загрузка больших файлов")."""
+    path = f"{object_prefix}/{dest_name}"
+    result = _supabase_client().storage.from_(SUPABASE_STORAGE_BUCKET).create_signed_upload_url(path)
+    return {"signed_url": result["signed_url"], "path": path}
+
+
 def signed_url_for(storage_ref: str, expires_in: int = 3600) -> str:
     """Только для CLOUD_MODE — временная подписанная ссылка, чтобы не проксировать файл через функцию."""
     result = _supabase_client().storage.from_(SUPABASE_STORAGE_BUCKET).create_signed_url(storage_ref, expires_in)

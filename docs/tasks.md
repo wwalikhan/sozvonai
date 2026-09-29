@@ -74,7 +74,137 @@ Batch и live пайплайны прогнаны на настоящей рус
 6. ✅ UI — `static/videos.html` (список + форма отправки ссылки) и `static/video.html` (отчёт + полный транскрипт + экспорт .txt на клиенте). Ссылка "Видео-инсайты" добавлена в шапку `live.html`/`calls.html`/`call.html`.
 7. ✅ Проверено end-to-end через реальный HTTP-запрос (`POST /videos` → фоновая обработка → `GET /videos/{id}`) на реальном YouTube-видео — скачивание, автоопределение языка, суммаризация в отчёт — всё отработало корректно.
 
-## Деплой на Vercel (облачный режим, Gemini) — 🟡 в процессе, продолжить в новой сессии
+## Деплой на Vercel (облачный режим, Gemini) — ✅ первый прод-деплой живой (2026-09-29)
+
+Финальный деплой создан и прошёл: `sozvonai-walikhan.vercel.app`. `GET /health` → `{"status":"ok"}`,
+`GET /config` → `live_enabled: false`, `auth_enabled: true`, статика (`/`, `/static/login.html`,
+`/static/calls.html`, `/static/videos.html`) отдаёт 200.
+
+**Как в итоге собрали все 27 файлов** (без `upload_file`/base64 для последних двух —
+оказалось не нужно): 25 файлов сослались по `{file, sha, size}` на уже подтверждённые
+в sha-кэше Vercel (см. таблицу ниже), а `static/live.html` и `pyproject.toml` передали
+прямо в `create_deployment` как инлайн `{file, data, encoding: "utf-8"}` — раз файл целиком
+читается одним `Read` без обрезки (это удалось для `live.html`, 706 строк/24229 байт), можно
+обойтись без base64 вообще: побайтовая проверка (`Write` копии + `diff`/`sha1sum` против
+исходника) подтвердила точное совпадение перед вставкой в вызов.
+
+**Единственная проблема при первом прогоне** — `create_deployment` упал на шаге билда:
+```
+Failed to run "uv lock --python ...": error: The requested interpreter resolved to
+Python 3.12.14, which is incompatible with the project's Python requirement: `==3.11.*`
+```
+Vercel в этом окружении резолвит Python 3.12, а `backend/pyproject.toml` жёстко требовал
+`>=3.11,<3.12`. Исправлено: `requires-python = ">=3.11,<3.13"` (безопасно — облачные базовые
+зависимости из `[project.dependencies]` не завязаны на конкретный минор; тяжёлые ML-пакеты
+под 3.11 остаются в `[project.optional-dependencies] local`, который в облаке не ставится).
+После правки передеплой прошёл с первого раза.
+
+### Осталось (не блокирует, но не проверено)
+1. ✅ Сквозной логин через `login.html` на реальном Supabase-проекте на проде — подтверждено пользователем (2026-09-29). Заодно выяснилось и поправлено: Supabase Auth Site URL/Redirect URLs всё ещё указывали на `localhost` из локальной разработки — нужно вручную поправить в Dashboard (Authentication → URL Configuration) на `https://sozvonai-walikhan.vercel.app` (у ассистента нет MCP-доступа к этим настройкам).
+2. Загрузить тестовую запись через `/static/calls.html` на проде, убедиться что статус доходит до `done`.
+3. Через Supabase MCP (`execute_sql`/`list_storage_buckets`) сверить, что строки и файл записи реально попадают в `calls`/`audio_files`/`speakers`/`transcript_segments` и bucket `call-audio`.
+
+### Найденный и исправленный баг: лимит Vercel на размер тела запроса (2026-09-29)
+Загрузка реальной записи (26МБ .m4a) падала на проде с общей ошибкой "не удалось
+загрузить файл". Причина — жёсткий платформенный лимит Vercel на тело запроса к
+serverless-функции: **~4.5МБ**, не настраивается через `vercel.json` (проверено
+напрямую: файл 4МБ проходит до проверки авторизации, 6МБ Vercel обрубает раньше
+с `FUNCTION_PAYLOAD_TOO_LARGE`/413).
+
+Исправлено — прямая загрузка с браузера в Supabase Storage по signed URL, в обход
+тела запроса к функции:
+- `app/storage_backend.py: create_signed_upload_url()` — новая функция.
+- `app/pipeline.py: process_call_from_storage()` — скачивает файл из Storage во
+  временный файл и обрабатывает как обычно (переиспользует `_process_call_cloud`).
+- `app/main.py`: `POST /calls/upload-url` (шаг 1 — создаёт `call`, отдаёт signed
+  URL) + `POST /calls/{id}/finalize` (шаг 2 — вызывается после прямой загрузки,
+  запускает обработку). Оба — только `CLOUD_MODE` (404 иначе). `GET /config`
+  получил новое поле `direct_upload_enabled`.
+- `static/js/session.js`: `isDirectUploadEnabled()`.
+- `static/calls.html`: кнопка "Загрузить" ветвится — в облаке идёт по новой
+  двухшаговой схеме (`upload-url` → `PUT` в Supabase Storage напрямую → `finalize`),
+  локально (SQLite, `direct_upload_enabled: false`) — старым способом без изменений.
+
+Задеплоено и проверено на проде (2026-09-29): `GET /config` отдаёт
+`direct_upload_enabled: true`, `POST /calls/upload-url` без токена → 401 (не 404,
+эндпоинт существует и требует авторизацию). Полный сквозной тест с реальной
+загрузкой файла — см. пункт 2 выше, ещё не прогнан.
+
+### Миграция ASR/суммаризации с Gemini на Groq (2026-09-29, код готов, ДЕПЛОЙ ЗАБЛОКИРОВАН)
+Реальная загрузка (26МБ .m4a, затем и mp3) после фикса direct-upload стабильно падала
+на этапе транскрибации с `503 UNAVAILABLE` от Gemini. Прямая проверка API ключа
+показала: `gemini-3.6-flash`/`gemini-flash-latest` — живые 503 (перегрузка на стороне
+Google прямо сейчас, не разовая случайность), `gemini-2.0/2.5-flash(-lite)`,
+`gemini-2.5-pro`, `gemini-3-pro-preview`, `gemini-1.5-flash` — 404 (сняты с бесплатных
+ключей), `gemini-pro-latest` — 429 (квота исчерпана). На бесплатном ключе у Gemini не
+осталось рабочего запасного варианта вообще.
+
+По решению пользователя — полный переход на Groq (`app/groq_transcribe.py`, замена
+`app/gemini_transcribe.py`, который удалён):
+- Whisper (`whisper-large-v3-turbo`) для транскрибации — **без диаризации** (Groq
+  Whisper её не делает, в отличие от Gemini): все сегменты в облаке идут под единой
+  меткой "Спикер 1". Восстановление разметки по спикерам в облаке — отдельная
+  будущая задача.
+- `openai/gpt-oss-120b` (через Groq) — суммаризация для video-insights, замена
+  `summarize_text`.
+- `app/config.py`: `GEMINI_API_KEY`/`GEMINI_MODEL` → `GROQ_API_KEY`,
+  `GROQ_WHISPER_MODEL` (default `whisper-large-v3-turbo`), `GROQ_LLM_MODEL` (default
+  `openai/gpt-oss-120b`). Доступные модели на бесплатном ключе проверены напрямую
+  через `client.models.list()` — не гадать, список меняется.
+- `pyproject.toml`: `google-genai` → `groq`. `backend/.env` и Vercel env
+  (`prj_36QmOIRilaNsKenJxR6S6QEml20q`) дополнены `GROQ_API_KEY` (upsert).
+- Проверено локально (`uv run`): и транскрибация, и суммаризация реально отвечают
+  через живой Groq API до деплоя на Vercel.
+
+**Деплой заблокирован багом на стороне Vercel (не в нашем коде), обнаружен 2026-09-29:**
+любой `create_deployment` с непустым `vercel.json`-ключом `"functions"` (даже
+байт-в-байт идентичным содержимому уже работавшего прод-деплоя, включая просто
+`{"app/main.py": {"maxDuration": 300}}` без `excludeFiles`/`fluid`) падает на шаге
+сборки с `errorCode: "unused_function"`: `The pattern "app/main.py" defined in
+'functions' doesn't match any Serverless Functions inside the 'api' directory.`
+Билд падает за 1.5-4 секунды — слишком быстро для реальной установки зависимостей,
+похоже на сбой валидации ДО реального билда. Проверено и исключено как причина:
+- Разрешение зависимостей (`uv pip compile pyproject.toml --python-version 3.12`) —
+  чистое, `groq` резолвится без конфликтов.
+- Синтаксис всех изменённых `.py`-файлов (`py_compile`) — ок.
+- `rootDirectory`/`framework` на самом Vercel-проекте сброшены в `null` явно — не
+  помогло.
+- Дословный редеплой уже работавшего набора файлов (все 27 sha от READY-деплоя
+  `dpl_HXtRNUs5nNDRXfXHroEsuGKuppTQ`, без единого изменения) — падает с той же
+  ошибкой. Это доказывает, что дело не в правках, а в состоянии платформы/проекта.
+- Без `vercel.json` вообще (zero-config) деплой проходит (`READY`), но тогда
+  FastAPI-приложение монтируется только на буквальный путь `/app/main.py`, а не на
+  `/` — `/health`, `/config`, `/` отдают 404.
+- `vercel.json` с `"rewrites": [{"source": "/(.*)", "destination": "/app/main.py"}]`
+  вместо `"functions"` — деплой проходит, но rewrite НЕ эквивалентен настоящей
+  serverless-функции: Vercel отдаёт **сырой исходный код `main.py` как текст**
+  вместо выполнения приложения. Опасно — сразу откачено.
+- **Аварийный откат уже сделан**: `mcp__vercel__request_promote` на
+  `dpl_HXtRNUs5nNDRXfXHroEsuGKuppTQ` — прод сейчас снова на этом READY-деплое
+  (старый Gemini-код), `/health`/`/config`/`/` отвечают корректно, исходники не
+  протекают. Повторная проверка (`create_deployment` с оригинальным
+  `vercel.json.functions`) спустя ~20 минут — та же ошибка, баг не разовый.
+- `resourceConfig.functionDefaultTimeout: 300` выставлен на проекте через
+  `update_project` как запасной способ задать таймаут функции в обход
+  `vercel.json.functions`, если/когда получится задеплоить без него.
+
+**Что пробовать дальше, когда возвращаться к этой задаче:**
+1. Просто повторить `create_deployment` с оригинальным `vercel.json` (полный список
+   файлов ниже) — не исключено, что баг временный и снимется сам.
+2. Git-репозиторий подключён (`https://github.com/wwalikhan/sozvonai.git`), но
+   Vercel-проект `sozvonai` НЕ связан с ним через git-интеграцию (все деплои шли
+   напрямую через `create_deployment` с inline-файлами — см. архивный раздел ниже,
+   `create_git_project` не сработал ещё в прошлой сессии, 403). Если API-путь
+   деплоя останется сломан — подключить git-интеграцию (через Vercel Dashboard,
+   Settings → Git) и задеплоить пушем в `main`: это другой билд-пайплайн, возможно
+   не задет тем же багом.
+3. Код для Groq полностью готов в рабочем дереве (не закоммичен на момент записи
+   этого раздела) — файлы: `app/config.py`, `app/main.py`, `app/pipeline.py`,
+   `app/storage_backend.py`, `app/video_insights.py`, `app/groq_transcribe.py`
+   (новый, замена `gemini_transcribe.py`), `pyproject.toml`. **Не переписывать
+   заново** — просто задеплоить, когда баг Vercel снимется.
+
+## Архив: процесс заливки файлов (историческая справка, актуально для будущих деплоев с большими/кириллическими файлами)
 
 Контекст и полный план: `C:\Users\Uali_\.claude\plans\eventual-watching-quill.md`.
 Код для `CLOUD_MODE` уже написан, закоммичен и запушен (main, коммит `f2517e4`
@@ -114,7 +244,7 @@ Batch и live пайплайны прогнаны на настоящей рус
 base64-блобов один раз уже дала `sha1sum_mismatch`/`Binary arguments must be
 valid base64 strings`.
 
-### Прогресс загрузки файлов (17 из 27 подтверждены в sha-хранилище Vercel)
+### Прогресс загрузки файлов (26 из 27 подтверждены в sha-хранилище Vercel)
 Уже готовы к финальному деплою по `{file, sha, size}` (не перезаливать):
 ```
 app/__init__.py            da39a3ee5e6b4b0d3255bfef95601890afd80709   0
@@ -138,18 +268,22 @@ static/js/session.js         79afc3a0ce97f3e65b2fde41b3bdb5c774ece7ce 3757
 (sha1/size всегда можно пересчитать заново: `sha1sum <файл>` + `stat -c%s <файл>`
 из `backend/` — если вдруг не совпадёт, значит файл поменялся, перезалить.)
 
-Ещё нужно залить через `upload_file` (базовая сессия прервалась ровно на первом
-из них — `gemini_transcribe.py` мог не долиться, статус неизвестен, перепроверить):
+Ещё нужно залить через `upload_file` (`gemini_transcribe.py`, `pipeline.py`, `main.py`, `video_insights.py`,
+`login.html`, `videos.html`, `video.html`, `calls.html`, `call.html` подтверждены 2026-09-29). **Важный урок по надёжной заливке файлов с кириллицей** (комментарии на русском
+внутри .py — актуально и для будущих переносов, не только для этих 27 файлов): ручной перенос base64
+длиннее ~5КБ ненадёжен даже с одноразовой раунд-трип-проверкой — модель может *регенерировать* (не
+скопировать) строку заново и почти всегда спотыкается на тех же кириллических фрагментах. Рабочая
+процедура:
+1. `base64 -w0 <файл> > /tmp/x.b64`.
+2. Разбить на куски ~5000 байт: `head -c 5000 x.b64 > x_p1.b64; tail -c +5001 x.b64 > x_p2.b64`.
+3. Для каждого куска — Write в scratchpad, затем `tr -d '\n' < <written> | cmp - <часть источника>`.
+4. При расхождении — не перепечатывать весь кусок заново (только множит ошибки); найти байт-оффсет
+   через `cmp`, взять безопасный уникальный якорь через `grep -bo`, и склеить `head -c <offset> <мой файл>`
+   + `tail -c +<offset+1> <исходный файл>` — то есть чинить сам файл на диске байтами из истинного
+   источника, а не ретайпом.
+5. Когда все куски побайтово совпадают — `cat` их вместе, сверить sha1 с ожидаемым, и только тогда
+   один раз вставить получившийся текст в `upload_file`.
 ```
-app/gemini_transcribe.py    7691b359c5760a9f699fb01080d33d5f607d19e4  6054
-app/pipeline.py              a742461f254e5d93b1fdb1ec4a1ac025fdbd6955 9780
-app/main.py                  b3639aa7f3a02b0cd9b4c1a8a1b088c71856316c 17570
-app/video_insights.py        be68e0664a9e62f93205367bad439803d1b94dfd 8133
-static/login.html            46c1b0ca7c64c8488c8646d2039b633a65308c4b 10183
-static/videos.html           74c843e6a0b912897a3bec190846c00980d86379 14172
-static/video.html            2e9338686458b4b5beda00eafe79fec682c01445 14382
-static/calls.html            6080d5d3c660c3466453bbfefbd0eca5dc513891 22037
-static/call.html             2606069d34d87b06c862f6cac491c5d727f0e40f 24100
 static/live.html             3cdee38f5f1437a1229054c38f9d6340153ec96f 24229
 ```
 

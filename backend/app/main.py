@@ -20,17 +20,17 @@ from app.config import (
     BACKEND_ROOT,
     CLOUD_MODE,
     DATABASE_URL,
-    GEMINI_API_KEY,
+    GROQ_API_KEY,
     STORAGE_DIR,
     SUPABASE_ANON_KEY,
     SUPABASE_URL,
 )
-from app.pipeline import LiveCallSession, process_call
+from app.pipeline import LiveCallSession, process_call, process_call_from_storage
 from app.reconciliation import reconcile_live_call
 from app.video_insights import new_video_id, process_video
 
-if CLOUD_MODE and (not DATABASE_URL or not GEMINI_API_KEY):
-    raise RuntimeError("CLOUD_MODE requires both DATABASE_URL and GEMINI_API_KEY to be set")
+if CLOUD_MODE and (not DATABASE_URL or not GROQ_API_KEY):
+    raise RuntimeError("CLOUD_MODE requires both DATABASE_URL and GROQ_API_KEY to be set")
 
 app = FastAPI(title="SozvonAI")
 db.init_db()
@@ -52,6 +52,7 @@ class ConfigOut(BaseModel):
     supabase_url: str | None
     supabase_anon_key: str | None
     live_enabled: bool
+    direct_upload_enabled: bool
 
 
 @app.get("/config", response_model=ConfigOut)
@@ -61,6 +62,10 @@ def get_config() -> ConfigOut:
         supabase_url=SUPABASE_URL,
         supabase_anon_key=SUPABASE_ANON_KEY,
         live_enabled=not CLOUD_MODE,
+        # Vercel-функции режут тело запроса примерно на 4.5МБ (платформенный
+        # лимит, не настраивается) — в облаке фронтенд обязан грузить файл
+        # напрямую в Supabase Storage по signed URL, минуя POST /calls/upload.
+        direct_upload_enabled=CLOUD_MODE,
     )
 
 
@@ -97,6 +102,51 @@ async def upload_call(
         db.save_audio_file(call_id, str(call_dir / "audio.wav"), fmt="wav", size_bytes=raw_path.stat().st_size)
         background_tasks.add_task(process_call, call_id, str(raw_path))
 
+    return UploadResponse(call_id=call_id, status="processing")
+
+
+class UploadUrlRequest(BaseModel):
+    filename: str
+
+
+class UploadUrlResponse(BaseModel):
+    call_id: str
+    upload_url: str
+    storage_path: str
+
+
+@app.post("/calls/upload-url", response_model=UploadUrlResponse)
+def create_upload_url(body: UploadUrlRequest, user_id: str = Depends(get_current_user_id)) -> UploadUrlResponse:
+    """Шаг 1 прямой загрузки (см. POST /calls/{id}/finalize) — только CLOUD_MODE:
+    отдаёт signed URL, по которому браузер грузит файл напрямую в Supabase Storage,
+    в обход тела запроса к самой Vercel-функции (лимит ~4.5МБ, см. docs/tasks.md)."""
+    if not CLOUD_MODE:
+        raise HTTPException(status_code=404, detail="direct upload is only available in cloud mode")
+    call_id = str(uuid.uuid4())
+    suffix = Path(body.filename or "upload").suffix
+    db.create_call(call_id, title=body.filename or call_id, source="upload", user_id=user_id)
+    upload = storage_backend.create_signed_upload_url(call_id, dest_name=f"raw{suffix}")
+    return UploadUrlResponse(call_id=call_id, upload_url=upload["signed_url"], storage_path=upload["path"])
+
+
+class FinalizeUploadRequest(BaseModel):
+    storage_path: str
+
+
+@app.post("/calls/{call_id}/finalize", response_model=UploadResponse)
+async def finalize_upload(
+    call_id: str, body: FinalizeUploadRequest, user_id: str = Depends(get_current_user_id)
+) -> UploadResponse:
+    """Шаг 2 прямой загрузки — вызывается фронтендом после того, как файл долетел
+    до Supabase Storage напрямую (шаг 1: POST /calls/upload-url)."""
+    if not CLOUD_MODE:
+        raise HTTPException(status_code=404, detail="direct upload is only available in cloud mode")
+    if db.get_call(call_id, user_id=user_id) is None:
+        raise HTTPException(status_code=404, detail="call not found")
+    if not body.storage_path.startswith(f"{call_id}/"):
+        raise HTTPException(status_code=400, detail="storage_path does not match call_id")
+
+    await run_in_threadpool(process_call_from_storage, call_id, body.storage_path)
     return UploadResponse(call_id=call_id, status="processing")
 
 

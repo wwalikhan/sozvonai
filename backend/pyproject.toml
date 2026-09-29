@@ -2,7 +2,7 @@
 name = "sozvonai-backend"
 version = "0.1.0"
 description = "SozvonAI backend — локальная транскрибация и диаризация деловых звонков"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.11,<3.13"
 # Базовые зависимости — ставятся везде, включая облачный деплой на Vercel
 # (CLOUD_MODE=true, см. app/config.py). Тяжёлые ML-пакеты для локального
 # GPU-пайплайна — в extra "local" ниже, чтобы они физически не попадали в
@@ -18,7 +18,7 @@ dependencies = [
     "sqlalchemy>=2.0",
     "psycopg[binary]>=3.1",
     "pyjwt[crypto]>=2.9",
-    "google-genai>=1.0",
+    "groq>=0.11",
     "supabase>=2.0",
     "imageio-ffmpeg>=0.5",
 ]

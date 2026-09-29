@@ -16,7 +16,13 @@ async function loadConfig() {
         if (!res.ok) throw new Error('bad /config status');
         return res.json();
       })
-      .catch(() => ({ auth_enabled: false, supabase_url: null, supabase_anon_key: null, live_enabled: true }));
+      .catch(() => ({
+        auth_enabled: false,
+        supabase_url: null,
+        supabase_anon_key: null,
+        live_enabled: true,
+        direct_upload_enabled: false,
+      }));
   }
   return configPromise;
 }
@@ -44,6 +50,14 @@ export async function isAuthEnabled() {
 export async function isLiveEnabled() {
   const config = await loadConfig();
   return config.live_enabled !== false;
+}
+
+/** true только в облачном деплое (CLOUD_MODE) — там тело запроса к самой Vercel-
+ * функции ограничено ~4.5МБ (платформенный лимит), поэтому файл грузится
+ * напрямую в Supabase Storage по signed URL, а не через POST /calls/upload. */
+export async function isDirectUploadEnabled() {
+  const config = await loadConfig();
+  return Boolean(config.direct_upload_enabled);
 }
 
 /** Текущая сессия Supabase (или null — как в локальном режиме, так и без логина). */

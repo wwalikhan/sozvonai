@@ -2,7 +2,7 @@
 даёт ссылку на YouTube-видео, сервис скачивает аудио, расшифровывает и делает отчёт по
 ключевым мыслям. В отличие от звонков — без диаризации (обычно один рассказчик). Локально
 — без платных API суммаризации (локальная LLM через llama-cpp-python, CPU); в CLOUD_MODE
-(см. app/config.py) — через Gemini API, как и транскрибация (app/gemini_transcribe.py).
+(см. app/config.py) — через Groq API, как и транскрибация (app/groq_transcribe.py).
 """
 from __future__ import annotations
 
@@ -113,7 +113,7 @@ def summarize(transcript: str) -> str:
 
 
 def _summarize_cloud(transcript: str) -> str:
-    from app.gemini_transcribe import summarize_text
+    from app.groq_transcribe import summarize_text
 
     return summarize_text(_SUMMARY_SYSTEM_PROMPT, _SUMMARY_USER_TEMPLATE.format(transcript=transcript))
 
@@ -129,7 +129,7 @@ def process_video(video_id: str, url: str) -> None:
         wav_path, title, duration = download_audio(url, video_dir)
 
         if CLOUD_MODE:
-            from app.gemini_transcribe import transcribe_plain
+            from app.groq_transcribe import transcribe_plain
 
             transcript = transcribe_plain(wav_path, language_hint=None).strip()
         else:

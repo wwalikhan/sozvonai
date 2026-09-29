@@ -29,11 +29,12 @@ AUTH_ENABLED = bool(DATABASE_URL)
 # за "какая БД", этот — за "какой ASR-движок". На практике на проде оба всегда
 # включены вместе, но смешивать их в один флаг было бы обманчиво (см.
 # docs/architecture.md). В облаке нет GPU и достаточно памяти для faster-whisper/
-# pyannote — вместо них используется Gemini API (app/gemini_transcribe.py), а
+# pyannote — вместо них используется Groq API (app/groq_transcribe.py), а
 # live-звонки (WebSocket) недоступны — см. CLAUDE.md.
 CLOUD_MODE = os.environ.get("CLOUD_MODE", "").lower() in ("1", "true", "yes")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+GROQ_WHISPER_MODEL = os.environ.get("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")
+GROQ_LLM_MODEL = os.environ.get("GROQ_LLM_MODEL", "openai/gpt-oss-120b")
 SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "call-audio")
 # Service-role ключ — только для сервера (никогда не отдаётся фронтенду, в отличие
 # от SUPABASE_ANON_KEY). Нужен, чтобы бэкенд писал/читал Storage от имени любого

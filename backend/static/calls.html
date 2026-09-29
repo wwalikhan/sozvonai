@@ -487,7 +487,7 @@
   </div>
 
 <script type="module">
-import { isAuthEnabled, isLiveEnabled, getSession, signOut } from './js/session.js';
+import { isAuthEnabled, isLiveEnabled, isDirectUploadEnabled, getSession, signOut } from './js/session.js';
 import { authedFetch } from './js/api.js';
 
 (() => {
@@ -677,11 +677,36 @@ import { authedFetch } from './js/api.js';
     uploadStatus.textContent = 'Загружаем…';
 
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      const res = await authedFetch('/calls/upload', { method: 'POST', body: formData });
-      if (!res.ok) throw new Error('upload failed');
-      await res.json();
+      if (await isDirectUploadEnabled()) {
+        // Облако: тело запроса к самой Vercel-функции режется на ~4.5МБ
+        // (платформенный лимит) — грузим файл напрямую в Supabase Storage по
+        // signed URL, backend только оркестрирует (см. docs/tasks.md).
+        const urlRes = await authedFetch('/calls/upload-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: selectedFile.name }),
+        });
+        if (!urlRes.ok) throw new Error('upload-url failed');
+        const { call_id, upload_url, storage_path } = await urlRes.json();
+
+        const putForm = new FormData();
+        putForm.append('file', selectedFile);
+        const putRes = await fetch(upload_url, { method: 'PUT', body: putForm });
+        if (!putRes.ok) throw new Error('storage upload failed');
+
+        const finalizeRes = await authedFetch(`/calls/${encodeURIComponent(call_id)}/finalize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storage_path }),
+        });
+        if (!finalizeRes.ok) throw new Error('finalize failed');
+      } else {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        const res = await authedFetch('/calls/upload', { method: 'POST', body: formData });
+        if (!res.ok) throw new Error('upload failed');
+        await res.json();
+      }
       uploadStatus.className = 'upload-status ok';
       uploadStatus.textContent = 'Загружено — обрабатывается.';
       setSelectedFile(null);

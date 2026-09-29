@@ -83,11 +83,28 @@ def _process_call_local(call_id: str, raw_audio_path: str) -> None:
         Path(raw_audio_path).unlink(missing_ok=True)
 
 
+def process_call_from_storage(call_id: str, storage_raw_ref: str) -> None:
+    """Cloud-only: файл уже загружен в Supabase Storage напрямую с браузера по
+    signed upload URL (в обход лимита Vercel ~4.5МБ на тело запроса к функции,
+    см. docs/tasks.md) — скачиваем во временный файл, обрабатываем как обычно,
+    затем убираем сырой объект из Storage (в проде остаётся только audio.wav)."""
+    import tempfile
+
+    suffix = Path(storage_raw_ref).suffix
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(storage_backend.open_audio_for_read(storage_raw_ref).read())
+        raw_path = tmp.name
+    try:
+        _process_call_cloud(call_id, raw_path)
+    finally:
+        storage_backend.delete_audio(storage_raw_ref)
+
+
 def _process_call_cloud(call_id: str, raw_audio_path: str) -> None:
     import tempfile
 
     from app.audio_convert import convert_to_wav
-    from app.gemini_transcribe import transcribe_with_speakers
+    from app.groq_transcribe import transcribe_with_speakers
 
     wav_tmp_path: str | None = None
     try:
